@@ -8,6 +8,14 @@
     "preview": "astro preview",
     "astro": "astro"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BigfootDS/web-bigfootds.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BigfootDS/web-bigfootds/issues"
+  },
+  "homepage": "https://github.com/BigfootDS/web-bigfootds#readme",
   "dependencies": {
     "@astrojs/check": "^0.9.4",
     "@astrojs/mdx": "^4.0.2",

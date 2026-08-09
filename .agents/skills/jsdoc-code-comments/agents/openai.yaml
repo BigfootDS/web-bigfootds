@@ -1,0 +1,4 @@
+interface:
+  display_name: "JSDoc Code Comments"
+  short_description: "Write useful JavaScript and TypeScript JSDoc"
+  default_prompt: "Use $jsdoc-code-comments to improve the JSDoc comments in this code."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Conventional Commit Summary"
+  short_description: "Create one-line Conventional Commit messages"
+  default_prompt: "Use $conventional-commit-summary to summarise these changes as a one-line commit message."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Alex Writing Style"
+  short_description: "Write and edit in Alex Stormwood's voice"
+  default_prompt: "Use $alex-writing-style to rewrite this so it sounds like Alex Stormwood."

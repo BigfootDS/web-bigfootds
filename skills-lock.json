@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "alex-writing-style": {
+      "source": "alexstormwood/agentic-skills",
+      "sourceType": "github",
+      "skillPath": "alex-writing-style/SKILL.md",
+      "computedHash": "f8eb84919c79c8729e51031205a8a0774af459662c0aede4e0ffc56c6a09a0b8"
+    },
+    "conventional-commit-summary": {
+      "source": "alexstormwood/agentic-skills",
+      "sourceType": "github",
+      "skillPath": "conventional-commit-summary/SKILL.md",
+      "computedHash": "3591c61fe18794f0eaacf1996282e39eafd9781c5897ccb5cedefff391c722ab"
+    },
+    "jsdoc-code-comments": {
+      "source": "alexstormwood/agentic-skills",
+      "sourceType": "github",
+      "skillPath": "jsdoc-code-comments/SKILL.md",
+      "computedHash": "b7fabf0b186fa2b6ffc1002a38d06700b0a43f16ba224b950ba0c5c9442371de"
+    }
+  }
+}

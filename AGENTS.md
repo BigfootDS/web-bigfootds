@@ -24,3 +24,9 @@ Guidance for AI coding agents working in this repository.
   - `jsdoc-code-comments` for useful JSDoc and code-comment work.
   - `conventional-commit-summary` for one-line conventional commit subjects.
 
+## Shared workspace task cards
+
+- For BigfootDS workspace work that changes, reviews, or releases this repository, read the central task card in `web-bigfootds-wiki/src/content/docs/work-tracking/` and the versioned `web-bigfootds-wiki/agent-operations/OPERATING_CONTRACT.md`. In this workspace the wiki checkout is `../web-bigfootds-wiki`; otherwise use https://github.com/BigfootDS/web-bigfootds-wiki/tree/main/.
+- Do not begin material implementation until that task card is `approved`. It must record the concrete scope, affected repositories, focused branch, acceptance criteria, verification, and independent review.
+- Record progress, checks, commits, blockers, and review outcomes on the task card. Kimaki and Discord threads coordinate work but do not replace the Git-tracked record.
+- These local instructions remain binding for this repository. The shared task-card policy coordinates workspace work and cannot weaken local testing, documentation, security, or release requirements.

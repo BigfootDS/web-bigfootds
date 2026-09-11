@@ -1,5 +1,6 @@
 ---
 import { getNewsFilterOptions } from '../lib/news-discovery.mjs';
+import { serialiseJsonForScript } from '../lib/json-for-script.mjs';
 import FormattedDate from './FormattedDate.astro';
 
 interface PublicNewsPost {
@@ -18,12 +19,7 @@ interface PublicNewsPost {
 
 const { posts } = Astro.props as { posts: readonly PublicNewsPost[] };
 const options = getNewsFilterOptions(posts);
-const serialisedPosts = JSON.stringify(posts)
-	.replace(/</g, '\\u003c')
-	.replace(/>/g, '\\u003e')
-	.replace(/&/g, '\\u0026')
-	.replace(/\\u2028/g, '\\u2028')
-	.replace(/\\u2029/g, '\\u2029');
+const serialisedPosts = serialiseJsonForScript(posts);
 ---
 
 <section class="news-discovery" aria-labelledby="news-discovery-heading">

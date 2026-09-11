@@ -1,4 +1,6 @@
 ---
+import { serialiseJsonForScript } from '../../lib/json-for-script.mjs';
+
 interface Props {
 	heroImage?: string;
 	pubDate?: Date;
@@ -26,6 +28,6 @@ const article = title && pubDate
 
 {
 	article !== undefined && (
-		<script type="application/ld+json" is:inline set:html={JSON.stringify(article)}></script>
+		<script type="application/ld+json" is:inline set:html={serialiseJsonForScript(article)}></script>
 	)
 }

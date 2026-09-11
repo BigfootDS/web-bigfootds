@@ -95,6 +95,24 @@ export function createLiveOpsCatalogueUrl(publicApiBaseUrl, filters, cursor = un
 }
 
 /**
+ * Provides the privacy-preserving request options shared by every public
+ * catalogue read. The LiveOps browser page is anonymous, so it must not send
+ * website cookies or a referrer that could include a visitor's filter query.
+ *
+ * @param {AbortSignal} signal - Controller signal for cancelling a stale page request.
+ * @returns {RequestInit} Fetch options for the public catalogue only.
+ */
+export function createPublicLiveOpsRequestInit(signal) {
+  return {
+    cache: 'no-store',
+    credentials: 'omit',
+    headers: { accept: 'application/json' },
+    referrerPolicy: 'no-referrer',
+    signal
+  };
+}
+
+/**
  * Validates the deliberately small public response before UI code reads it.
  * The browser never receives a generic LiveOps configuration payload, internal
  * configuration key, revision ID, content hash, or staff identity.

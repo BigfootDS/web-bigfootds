@@ -5,6 +5,7 @@ import {
   LIVE_OPS_PAGE_SIZE,
   MAXIMUM_LIVE_OPS_QUERY_LENGTH,
   createLiveOpsCatalogueUrl,
+  createPublicLiveOpsRequestInit,
   readLiveOpsCursor,
   readLiveOpsFilters,
   readPublicLiveOpsCatalogue,
@@ -74,4 +75,15 @@ test('accepts only the small documented public catalogue DTO', () => {
     () => readPublicLiveOpsCatalogue({ items: Array.from({ length: 101 }, () => publicCatalogue.items[0]) }),
     /invalid public catalogue response/
   );
+});
+
+test('uses an anonymous, no-referrer request for public catalogue reads', () => {
+  const controller = new AbortController();
+  const request = createPublicLiveOpsRequestInit(controller.signal);
+
+  assert.equal(request.cache, 'no-store');
+  assert.equal(request.credentials, 'omit');
+  assert.deepEqual(request.headers, { accept: 'application/json' });
+  assert.equal(request.referrerPolicy, 'no-referrer');
+  assert.equal(request.signal, controller.signal);
 });

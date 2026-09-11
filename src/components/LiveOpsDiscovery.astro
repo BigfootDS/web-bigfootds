@@ -1,0 +1,288 @@
+---
+---
+
+<section class="live-ops-discovery" aria-labelledby="live-ops-heading">
+	<h1 id="live-ops-heading">Live now</h1>
+	<p>Browse public BigfootDS events and rotations that are active right now. Only project-approved public summaries appear here.</p>
+
+	<form id="live-ops-filters" action="/live-ops/" method="get">
+		<div class="filter-field filter-field-wide">
+			<label for="live-ops-query">Search titles and summaries</label>
+			<input id="live-ops-query" name="q" type="search" maxlength="120" autocomplete="off" />
+		</div>
+		<div class="filter-field">
+			<label for="live-ops-project">Project</label>
+			<input id="live-ops-project" name="project" type="search" inputmode="text" maxlength="80" autocapitalize="none" autocomplete="off" pattern="[a-z][a-z0-9._-]{0,79}" />
+		</div>
+		<div class="filter-field">
+			<label for="live-ops-type">Content type</label>
+			<select id="live-ops-type" name="type">
+				<option value="">All types</option>
+				<option value="content_set">Content set</option>
+				<option value="event_schedule">Event schedule</option>
+				<option value="reward_schedule">Reward schedule</option>
+				<option value="shop_rotation">Shop rotation</option>
+			</select>
+		</div>
+		<div class="filter-field">
+			<label for="live-ops-tag">Tag</label>
+			<input id="live-ops-tag" name="tag" type="search" inputmode="text" maxlength="80" autocapitalize="none" autocomplete="off" pattern="[a-z][a-z0-9._-]{0,79}" />
+		</div>
+		<div class="filter-actions">
+			<button type="submit">Apply filters</button>
+			<a href="/live-ops/" id="live-ops-clear-filters">Clear filters</a>
+		</div>
+	</form>
+
+	<p id="live-ops-status" aria-live="polite"></p>
+	<p id="live-ops-empty-state" hidden>No public Live Ops content matches those filters.</p>
+	<p id="live-ops-unavailable-state" hidden>Live Ops content is not available right now. Please try again later.</p>
+	<ul id="live-ops-results" aria-live="polite"></ul>
+	<button id="live-ops-next-page" type="button" hidden>Next page</button>
+	<noscript><p>Live Ops content changes at any time, so this page needs JavaScript to load current public summaries.</p></noscript>
+</section>
+
+<script>
+	import {
+		createLiveOpsCatalogueUrl,
+		createPublicLiveOpsRequestInit,
+		readLiveOpsCursor,
+		readLiveOpsFilters,
+		readPublicLiveOpsCatalogue,
+		serialiseLiveOpsFilters
+	} from '../lib/liveops-discovery.mjs';
+
+	type LiveOpsFilters = { project?: string; q?: string; tag?: string; type?: string };
+	type PublicLiveOpsItem = {
+		configType: string;
+		endsAt?: string;
+		id: string;
+		projectId: string;
+		startsAt: string;
+		summary: string;
+		tags: readonly string[];
+		title: string;
+	};
+
+	const apiBaseUrl = import.meta.env.PUBLIC_LIVEOPS_CONFIG_BASE_URL;
+	let requestController: AbortController | undefined;
+	let nextCursor: string | undefined;
+
+	function requireElement<T extends Element>(selector: string): T {
+		const element = document.querySelector<T>(selector);
+
+		if (element === null) throw new Error(`The Live Ops control ${selector} could not be initialised.`);
+		return element;
+	}
+
+	const form = requireElement<HTMLFormElement>('#live-ops-filters');
+	const query = requireElement<HTMLInputElement>('#live-ops-query');
+	const project = requireElement<HTMLInputElement>('#live-ops-project');
+	const type = requireElement<HTMLSelectElement>('#live-ops-type');
+	const tag = requireElement<HTMLInputElement>('#live-ops-tag');
+	const clear = requireElement<HTMLAnchorElement>('#live-ops-clear-filters');
+	const status = requireElement<HTMLElement>('#live-ops-status');
+	const emptyState = requireElement<HTMLElement>('#live-ops-empty-state');
+	const unavailableState = requireElement<HTMLElement>('#live-ops-unavailable-state');
+	const results = requireElement<HTMLUListElement>('#live-ops-results');
+	const nextPage = requireElement<HTMLButtonElement>('#live-ops-next-page');
+
+	function filtersFromLocation(): LiveOpsFilters {
+		return readLiveOpsFilters(new URLSearchParams(window.location.search));
+	}
+
+	function cursorFromLocation(): string | undefined {
+		return readLiveOpsCursor(new URLSearchParams(window.location.search));
+	}
+
+	function writeForm(filters: LiveOpsFilters) {
+		query.value = filters.q ?? '';
+		project.value = filters.project ?? '';
+		type.value = filters.type ?? '';
+		tag.value = filters.tag ?? '';
+	}
+
+	function updateUrl(filters: LiveOpsFilters, cursor: string | undefined) {
+		const parameters = serialiseLiveOpsFilters(filters, cursor);
+		const queryString = parameters.toString();
+		history.pushState({}, '', queryString === '' ? '/live-ops/' : `/live-ops/?${queryString}`);
+	}
+
+	function setAvailability(unavailable: boolean) {
+		unavailableState.hidden = !unavailable;
+		emptyState.hidden = true;
+		nextPage.hidden = true;
+	}
+
+	function renderItems(items: readonly PublicLiveOpsItem[]) {
+		results.replaceChildren(...items.map((item) => {
+			const listItem = document.createElement('li');
+			const article = document.createElement('article');
+			const title = document.createElement('h2');
+			const summary = document.createElement('p');
+			const metadata = document.createElement('p');
+			const tags = document.createElement('p');
+
+			title.textContent = item.title;
+			summary.textContent = item.summary;
+			metadata.className = 'live-ops-meta';
+			metadata.textContent = `${item.projectId} · ${item.configType} · active from ${formatDate(item.startsAt)}${item.endsAt === undefined ? '' : ` to ${formatDate(item.endsAt)}`}`;
+			tags.className = 'live-ops-tags';
+			for (const itemTag of item.tags) {
+				const tagLabel = document.createElement('span');
+				tagLabel.textContent = `#${itemTag}`;
+				tags.append(tagLabel);
+			}
+
+			article.append(title, summary, metadata, tags);
+			listItem.append(article);
+			return listItem;
+		}));
+	}
+
+	function formatDate(value: string): string {
+		return new Intl.DateTimeFormat('en-AU', {
+			dateStyle: 'medium',
+			timeStyle: 'short',
+			timeZone: 'UTC'
+		}).format(new Date(value));
+	}
+
+	async function load(filters: LiveOpsFilters, cursor: string | undefined) {
+		requestController?.abort();
+		requestController = new AbortController();
+		status.textContent = 'Loading current Live Ops content…';
+		results.replaceChildren();
+		setAvailability(false);
+
+		try {
+			const response = await fetch(
+				createLiveOpsCatalogueUrl(apiBaseUrl, filters, cursor),
+				createPublicLiveOpsRequestInit(requestController.signal)
+			);
+			if (!response.ok) throw new Error(`MS-LiveOpsConfig returned ${response.status}.`);
+
+			const catalogue = readPublicLiveOpsCatalogue(await response.json());
+			nextCursor = catalogue.nextCursor;
+			writeForm(filters);
+			renderItems(catalogue.items);
+			emptyState.hidden = catalogue.items.length !== 0;
+			nextPage.hidden = catalogue.nextCursor === undefined;
+			clear.hidden = serialiseLiveOpsFilters(filters).size === 0;
+			status.textContent = `Showing ${catalogue.items.length} active public ${catalogue.items.length === 1 ? 'item' : 'items'}.`;
+		} catch (error) {
+			if (error instanceof DOMException && error.name === 'AbortError') return;
+			setAvailability(true);
+			status.textContent = 'Could not load current Live Ops content.';
+		}
+	}
+
+	form.addEventListener('submit', (event) => {
+		event.preventDefault();
+		const filters = readLiveOpsFilters(new URLSearchParams({
+			project: project.value,
+			q: query.value,
+			tag: tag.value,
+			type: type.value
+		}));
+		updateUrl(filters, undefined);
+		void load(filters, undefined);
+	});
+
+	clear.addEventListener('click', (event) => {
+		event.preventDefault();
+		form.reset();
+		updateUrl({}, undefined);
+		void load({}, undefined);
+	});
+
+	nextPage.addEventListener('click', () => {
+		if (nextCursor === undefined) return;
+		const filters = filtersFromLocation();
+		updateUrl(filters, nextCursor);
+		void load(filters, nextCursor);
+	});
+
+	window.addEventListener('popstate', () => {
+		const filters = filtersFromLocation();
+		void load(filters, cursorFromLocation());
+	});
+
+	void load(filtersFromLocation(), cursorFromLocation());
+</script>
+
+<style>
+	.live-ops-discovery {
+		max-width: 960px;
+		margin: 0 auto;
+	}
+
+	form {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 1rem;
+		padding: 1rem;
+		border: 1px solid var(--theme-700);
+		border-radius: 0.5rem;
+	}
+
+	.filter-field {
+		display: grid;
+		gap: 0.25rem;
+	}
+
+	.filter-field-wide {
+		grid-column: span 2;
+	}
+
+	input,
+	select,
+	button {
+		min-height: 2.5rem;
+		font: inherit;
+	}
+
+	.filter-actions {
+		display: flex;
+		align-items: end;
+		gap: 1rem;
+		grid-column: span 2;
+	}
+
+	#live-ops-results {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+		gap: 1rem;
+		padding: 0;
+		list-style: none;
+	}
+
+	#live-ops-results article {
+		height: 100%;
+		padding: 1rem;
+		border: 1px solid var(--theme-700);
+		border-radius: 0.5rem;
+	}
+
+	.live-ops-meta,
+	.live-ops-tags {
+		font-size: 0.85em;
+	}
+
+	.live-ops-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+
+	@media (max-width: 720px) {
+		form {
+			grid-template-columns: 1fr;
+		}
+
+		.filter-field-wide,
+		.filter-actions {
+			grid-column: auto;
+		}
+	}
+</style>

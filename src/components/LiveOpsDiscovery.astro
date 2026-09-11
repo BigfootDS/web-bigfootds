@@ -8,7 +8,7 @@
 	<form id="live-ops-filters" action="/live-ops/" method="get">
 		<div class="filter-field filter-field-wide">
 			<label for="live-ops-query">Search titles and summaries</label>
-			<input id="live-ops-query" name="q" type="search" maxlength="120" autocomplete="off" />
+			<input id="live-ops-query" name="q" type="search" maxlength="100" autocomplete="off" />
 		</div>
 		<div class="filter-field">
 			<label for="live-ops-project">Project</label>
@@ -45,6 +45,7 @@
 <script>
 	import {
 		createLiveOpsCatalogueUrl,
+		createLatestLiveOpsRequestCoordinator,
 		createPublicLiveOpsRequestInit,
 		readLiveOpsCursor,
 		readLiveOpsFilters,
@@ -65,6 +66,7 @@
 	};
 
 	const apiBaseUrl = import.meta.env.PUBLIC_LIVEOPS_CONFIG_BASE_URL;
+	const requestCoordinator = createLatestLiveOpsRequestCoordinator();
 	let requestController: AbortController | undefined;
 	let nextCursor: string | undefined;
 
@@ -149,8 +151,13 @@
 	}
 
 	async function load(filters: LiveOpsFilters, cursor: string | undefined) {
+		const isCurrentRequest = requestCoordinator.begin();
 		requestController?.abort();
-		requestController = new AbortController();
+		const controller = new AbortController();
+		requestController = controller;
+		writeForm(filters);
+		clear.hidden = serialiseLiveOpsFilters(filters).size === 0;
+		nextCursor = undefined;
 		status.textContent = 'Loading current Live Ops content…';
 		results.replaceChildren();
 		setAvailability(false);
@@ -158,20 +165,21 @@
 		try {
 			const response = await fetch(
 				createLiveOpsCatalogueUrl(apiBaseUrl, filters, cursor),
-				createPublicLiveOpsRequestInit(requestController.signal)
+				createPublicLiveOpsRequestInit(controller.signal)
 			);
+			if (!isCurrentRequest()) return;
 			if (!response.ok) throw new Error(`MS-LiveOpsConfig returned ${response.status}.`);
 
-			const catalogue = readPublicLiveOpsCatalogue(await response.json());
+			const responseBody = await response.json();
+			if (!isCurrentRequest()) return;
+			const catalogue = readPublicLiveOpsCatalogue(responseBody);
 			nextCursor = catalogue.nextCursor;
-			writeForm(filters);
 			renderItems(catalogue.items);
 			emptyState.hidden = catalogue.items.length !== 0;
 			nextPage.hidden = catalogue.nextCursor === undefined;
-			clear.hidden = serialiseLiveOpsFilters(filters).size === 0;
 			status.textContent = `Showing ${catalogue.items.length} active public ${catalogue.items.length === 1 ? 'item' : 'items'}.`;
 		} catch (error) {
-			if (error instanceof DOMException && error.name === 'AbortError') return;
+			if (!isCurrentRequest() || (error instanceof DOMException && error.name === 'AbortError')) return;
 			setAvailability(true);
 			status.textContent = 'Could not load current Live Ops content.';
 		}

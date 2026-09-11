@@ -1,11 +1,11 @@
 export const LIVE_OPS_PAGE_SIZE = 20;
-export const MAXIMUM_LIVE_OPS_QUERY_LENGTH = 120;
+export const MAXIMUM_LIVE_OPS_QUERY_LENGTH = 100;
 const maximumCursorLength = 512;
 const maximumCatalogueItemCount = 100;
 const maximumIdentifierLength = 80;
-const maximumSummaryLength = 500;
-const maximumTagCount = 10;
-const maximumTitleLength = 120;
+const maximumSummaryLength = 600;
+const maximumTagCount = 12;
+const maximumTitleLength = 160;
 const cursorPattern = /^[A-Za-z0-9_-]+$/;
 const stableIdentifierPattern = /^[a-z][a-z0-9._-]{0,79}$/;
 const liveOpsConfigTypes = new Set(['content_set', 'event_schedule', 'reward_schedule', 'shop_rotation']);
@@ -110,6 +110,24 @@ export function createPublicLiveOpsRequestInit(signal) {
     headers: { accept: 'application/json' },
     referrerPolicy: 'no-referrer',
     signal
+  };
+}
+
+/**
+ * Marks the latest asynchronous page load. Aborting a fetch cannot prevent a
+ * response that already resolved from continuing, so callers must check the
+ * returned predicate again after every await before changing the document.
+ *
+ * @returns {{ begin: () => () => boolean }} Coordinator for one rendered catalogue page.
+ */
+export function createLatestLiveOpsRequestCoordinator() {
+  let latestRequest = 0;
+
+  return {
+    begin() {
+      const request = ++latestRequest;
+      return () => request === latestRequest;
+    }
   };
 }
 

@@ -5,6 +5,7 @@ import {
   LIVE_OPS_PAGE_SIZE,
   MAXIMUM_LIVE_OPS_QUERY_LENGTH,
   createLiveOpsCatalogueUrl,
+  createLatestLiveOpsRequestCoordinator,
   createPublicLiveOpsRequestInit,
   readLiveOpsCursor,
   readLiveOpsFilters,
@@ -39,6 +40,7 @@ test('reads and serialises bounded, shareable public catalogue filters', () => {
   });
   assert.deepEqual(readLiveOpsFilters(new URLSearchParams('project=../../private&type=not%20valid')), {});
   assert.deepEqual(readLiveOpsFilters(new URLSearchParams('type=not_a_liveops_type')), {});
+  assert.equal(MAXIMUM_LIVE_OPS_QUERY_LENGTH, 100);
   assert.equal(readLiveOpsFilters(new URLSearchParams(`q=${'q'.repeat(MAXIMUM_LIVE_OPS_QUERY_LENGTH + 1)}`)).q.length, MAXIMUM_LIVE_OPS_QUERY_LENGTH);
   assert.equal(
     serialiseLiveOpsFilters(filters, 'cGFnZTox').toString(),
@@ -64,6 +66,14 @@ test('builds an anonymous public catalogue request from a bare public origin', (
 
 test('accepts only the small documented public catalogue DTO', () => {
   assert.deepEqual(readPublicLiveOpsCatalogue(publicCatalogue), publicCatalogue);
+  assert.doesNotThrow(() => readPublicLiveOpsCatalogue({
+    items: [{
+      ...publicCatalogue.items[0],
+      summary: 's'.repeat(600),
+      tags: Array.from({ length: 12 }, (_, index) => `tag-${index}`),
+      title: 't'.repeat(160)
+    }]
+  }));
   assert.throws(
     () => readPublicLiveOpsCatalogue({ items: [{ ...publicCatalogue.items[0], payload: { secret: true } }] }),
     /non-public fields/
@@ -75,6 +85,10 @@ test('accepts only the small documented public catalogue DTO', () => {
   assert.throws(
     () => readPublicLiveOpsCatalogue({ items: [{ ...publicCatalogue.items[0], configType: 'not_a_liveops_type' }] }),
     /invalid configType/
+  );
+  assert.throws(
+    () => readPublicLiveOpsCatalogue({ items: [{ ...publicCatalogue.items[0], title: 't'.repeat(161) }] }),
+    /invalid title/
   );
   assert.throws(
     () => readPublicLiveOpsCatalogue({ items: [{ ...publicCatalogue.items[0], endsAt: publicCatalogue.items[0].startsAt }] }),
@@ -95,4 +109,13 @@ test('uses an anonymous, no-referrer request for public catalogue reads', () => 
   assert.deepEqual(request.headers, { accept: 'application/json' });
   assert.equal(request.referrerPolicy, 'no-referrer');
   assert.equal(request.signal, controller.signal);
+});
+
+test('marks an older page request stale after a newer request begins', () => {
+  const coordinator = createLatestLiveOpsRequestCoordinator();
+  const firstRequestIsCurrent = coordinator.begin();
+  const secondRequestIsCurrent = coordinator.begin();
+
+  assert.equal(firstRequestIsCurrent(), false);
+  assert.equal(secondRequestIsCurrent(), true);
 });

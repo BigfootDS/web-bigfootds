@@ -1,5 +1,57 @@
+export const MAXIMUM_DISCOVERY_ITEM_COUNT = 2_000;
+export const MAXIMUM_DISCOVERY_PAYLOAD_CHARACTERS = 4_000_000;
+export const MAXIMUM_DISCOVERY_SUMMARY_LENGTH = 2_000;
+export const MAXIMUM_DISCOVERY_TITLE_LENGTH = 300;
+const maximumDiscoveryCategoryLength = 100;
+const maximumDiscoveryIdLength = 24;
+const maximumDiscoveryProjectLength = 100;
+const maximumDiscoveryPublishAtLength = 30;
+const maximumDiscoveryTagCount = 50;
+const maximumDiscoveryTagLength = 100;
 const maximumQueryLength = 120;
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * Selects the small public index sent to a visitor's browser. Full article
+ * bodies remain available only to the server while it generates individual
+ * static article pages, preventing the discovery page from duplicating every
+ * published body in one response.
+ *
+ * The item, field, and total payload limits fail the build with a useful error
+ * before a growing archive can make the static discovery page impractical.
+ *
+ * @param {readonly PublicNewsSourcePost[]} posts - Validated generator snapshot.
+ * @returns {readonly PublicNewsDiscoveryPost[]} Bounded metadata for browser filtering.
+ * @throws {Error} When the snapshot exceeds discovery-page safety limits.
+ */
+export function createNewsDiscoveryIndex(posts) {
+  if (posts.length > MAXIMUM_DISCOVERY_ITEM_COUNT) {
+    throw new Error(
+      `Public news discovery supports at most ${MAXIMUM_DISCOVERY_ITEM_COUNT} posts; received ${posts.length}. `
+      + 'Add an approved archive or pagination design before publishing more.'
+    );
+  }
+
+  const index = posts.map((post, indexPosition) => ({
+    category: readBoundedText(post.category, 'category', maximumDiscoveryCategoryLength, indexPosition),
+    id: readBoundedText(post.id, 'id', maximumDiscoveryIdLength, indexPosition),
+    projectId: readBoundedText(post.projectId, 'projectId', maximumDiscoveryProjectLength, indexPosition),
+    publishAt: readBoundedText(post.publishAt, 'publishAt', maximumDiscoveryPublishAtLength, indexPosition),
+    summary: readBoundedText(post.content.summary, 'summary', MAXIMUM_DISCOVERY_SUMMARY_LENGTH, indexPosition),
+    tags: readBoundedTags(post.tags, indexPosition),
+    title: readBoundedText(post.content.title, 'title', MAXIMUM_DISCOVERY_TITLE_LENGTH, indexPosition)
+  }));
+  const payloadCharacters = JSON.stringify(index).length;
+
+  if (payloadCharacters > MAXIMUM_DISCOVERY_PAYLOAD_CHARACTERS) {
+    throw new Error(
+      `Public news discovery exceeds its ${MAXIMUM_DISCOVERY_PAYLOAD_CHARACTERS}-character payload limit. `
+      + 'Add an approved archive or pagination design before publishing more.'
+    );
+  }
+
+  return index;
+}
 
 /**
  * Extracts the safe, shareable news-filter state from a URL. Unknown or
@@ -68,9 +120,8 @@ export function filterPublicNews(posts, filters) {
     if (normalisedQuery === '') return true;
 
     const searchableText = normaliseSearchText([
-      post.content.title,
-      post.content.summary,
-      post.content.body
+      post.title,
+      post.summary
     ].join('\n'));
 
     return searchableText.includes(normalisedQuery);
@@ -93,7 +144,28 @@ export function getNewsFilterOptions(posts) {
   };
 }
 
-/** @typedef {{ category: string, content: { body: string, summary: string, title: string }, id: string, projectId: string, tags: readonly string[] }} PublicNewsDiscoveryPost */
+/** @typedef {{ category: string, content: { body: string, summary: string, title: string }, id: string, projectId: string, publishAt: string, tags: readonly string[] }} PublicNewsSourcePost */
+/** @typedef {{ category: string, id: string, projectId: string, publishAt: string, summary: string, tags: readonly string[], title: string }} PublicNewsDiscoveryPost */
+
+function readBoundedText(value, field, maximumLength, indexPosition) {
+  if (typeof value !== 'string' || value.length === 0 || value.length > maximumLength) {
+    throw new Error(
+      `Public news discovery item ${indexPosition + 1} has an invalid ${field}; maximum length is ${maximumLength}.`
+    );
+  }
+
+  return value;
+}
+
+function readBoundedTags(value, indexPosition) {
+  if (!Array.isArray(value) || value.length > maximumDiscoveryTagCount) {
+    throw new Error(
+      `Public news discovery item ${indexPosition + 1} has too many tags; maximum count is ${maximumDiscoveryTagCount}.`
+    );
+  }
+
+  return value.map((tag) => readBoundedText(tag, 'tag', maximumDiscoveryTagLength, indexPosition));
+}
 
 function normaliseQuery(value) {
   if (typeof value !== 'string') return undefined;

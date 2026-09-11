@@ -1,5 +1,5 @@
 ---
-import { getNewsFilterOptions } from '../lib/news-discovery.mjs';
+import { createNewsDiscoveryIndex, getNewsFilterOptions } from '../lib/news-discovery.mjs';
 import { serialiseJsonForScript } from '../lib/json-for-script.mjs';
 import FormattedDate from './FormattedDate.astro';
 
@@ -18,17 +18,18 @@ interface PublicNewsPost {
 }
 
 const { posts } = Astro.props as { posts: readonly PublicNewsPost[] };
-const options = getNewsFilterOptions(posts);
-const serialisedPosts = serialiseJsonForScript(posts);
+const discoveryPosts = createNewsDiscoveryIndex(posts);
+const options = getNewsFilterOptions(discoveryPosts);
+const serialisedPosts = serialiseJsonForScript(discoveryPosts);
 ---
 
 <section class="news-discovery" aria-labelledby="news-discovery-heading">
 	<h1 id="news-discovery-heading">News</h1>
-	<p>Browse published BigfootDS news, or narrow the list by project, category, tag, or text.</p>
+	<p>Browse published BigfootDS news, or search titles and summaries before narrowing by project, category, or tag.</p>
 
 	<form id="news-filters" action="/news/" method="get">
 		<div class="filter-field filter-field-wide">
-			<label for="news-query">Search news</label>
+			<label for="news-query">Search titles and summaries</label>
 			<input id="news-query" name="q" type="search" maxlength="120" autocomplete="off" />
 		</div>
 		<div class="filter-field">
@@ -86,10 +87,12 @@ const serialisedPosts = serialiseJsonForScript(posts);
 	type NewsFilters = { category?: string; project?: string; q?: string; tag?: string };
 	type PublicNewsPost = {
 		category: string;
-		content: { body: string; summary: string; title: string };
 		id: string;
 		projectId: string;
+		publishAt: string;
+		summary: string;
 		tags: readonly string[];
+		title: string;
 	};
 
 	function requireElement<T extends Element>(selector: string): T {

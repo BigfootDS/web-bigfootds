@@ -3,6 +3,9 @@ dist/
 # generated types
 .astro/
 
+# Build-time MS-News snapshot. The canonical news source remains MS-News.
+src/generated/
+
 # dependencies
 node_modules/
 

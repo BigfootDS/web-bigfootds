@@ -4,7 +4,10 @@
   "version": "0.0.1",
   "scripts": {
     "dev": "astro dev",
+    "news:sync": "node scripts/sync-news.mjs",
+    "prebuild": "npm run news:sync",
     "build": "astro build",
+    "test": "node --test",
     "preview": "astro preview",
     "astro": "astro"
   },

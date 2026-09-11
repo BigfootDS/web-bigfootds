@@ -17,6 +17,9 @@ permissions:
   pages: write
   id-token: write
 
+concurrency:
+  group: public-news-pages-deploy
+  cancel-in-progress: true
 
 
 jobs:

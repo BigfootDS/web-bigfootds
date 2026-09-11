@@ -74,3 +74,17 @@ The page does not interpret searches as regular expressions or send them to a se
 The Pages workflow runs after a push to `main`, on a manual workflow dispatch, every hour, and after the `news-publication-refresh` repository-dispatch event. The workflow intentionally ignores dispatch payload fields. One shared concurrency group cancels an older refresh when a newer one arrives, so a delayed scheduled build cannot deploy an older snapshot after a newer push or dispatch. The hourly run remains the safety net for scheduled publish and expiry changes while a separate credential decision is needed before MS-News can send a dispatch event.
 
 Run the deterministic behaviour tests with `npm test`. `npm run astro -- check` runs Astro diagnostics, and `npm run build` performs the sync and static build.
+
+## Public Live Ops catalogue
+
+Live Ops configuration is not automatically public just because a game can read it. The `/live-ops/` page asks MS-LiveOpsConfig for an opt-in catalogue of currently active, visitor-facing summaries. It never receives a generic configuration payload, configuration key, revision ID, content hash, staff identity, or browser credential.
+
+Set the non-secret public deployment variable `PUBLIC_LIVEOPS_CONFIG_BASE_URL` to the bare public MS-LiveOpsConfig HTTP(S) origin. The page makes no request when that value is absent, then shows a simple unavailable state instead of guessing a service URL. For local work, a bare `http://localhost:<port>` or `http://127.0.0.1:<port>` origin is also allowed.
+
+The catalogue stays live in the browser because an active window can start or finish at any UTC instant. Visitors can share a literal title-and-summary search plus project, content-type, and tag filters in the page URL:
+
+```text
+/live-ops/?q=spring&project=thebestestbeehive&type=event_schedule&tag=event
+```
+
+The page sends only anonymous, `no-store` requests with cookies omitted and no referrer. Add `https://bigfootds.com` to the deployed MS-LiveOpsConfig `CORS_ALLOWED_ORIGINS` value when releasing the matching catalogue endpoint. CORS is required for this browser feature, unlike the server-to-server news build. The service remains responsible for returning only bounded, explicitly approved public presentation metadata.

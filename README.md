@@ -51,13 +51,17 @@ npm run news:sync
 npm run build
 ```
 
-`npm run build` runs the sync first and fails with an actionable message when the variable is missing. The sync requests only `GET /api/v1/news` with `locale=en-AU` and a page size of 50, follows opaque cursors, validates the public DTO, and atomically replaces `src/generated/public-news.json`. That ignored file is not canonical content. Replacing it means a post that was unpublished or expired in MS-News is absent from the next generated build.
+`npm run build` runs the sync first and fails with an actionable message when the variable is missing. The sync requests only `GET /api/v1/news` with `locale=en-AU` and a page size of 50, follows opaque cursors, validates the public DTO, and atomically replaces `src/generated/public-news.json`. That ignored file is not canonical content. A post that was unpublished or expired in MS-News is removed only after the next successful refresh and deployment. A static site cannot revoke an already deployed page immediately.
 
 The build request is server-to-server, so MS-News does not need a browser CORS origin for this particular path. Keep `CORS_ALLOWED_ORIGINS` limited to actual browser callers. If a later approved feature adds browser API calls, add the exact website origin to that service's deployment configuration at that time.
 
 ### Search and filters
 
-The static news page offers literal, case-insensitive search across the published title, summary, and body, plus project, category, and tag filters. State is shareable as URL parameters:
+The static news page offers literal, case-insensitive browser search across the published title and summary, plus project, category, and tag filters. Article bodies are intentionally excluded from the discovery payload and remain only on individual static article pages. MS-News can still search public title, summary, and body through its server-side `q` contract for a later approved dynamic consumer.
+
+The browser index fails the build before it exceeds 2,000 posts or 4,000,000 JSON characters. Each indexed item permits a 24-character ID, 100-character project and category, 30-character publication timestamp, up to 50 tags of 100 characters, a 300-character title, and a 2,000-character summary. These limits keep a full news archive from becoming one large browser response.
+
+State is shareable as URL parameters:
 
 ```text
 /news/?q=release&project=playergamedata&category=announcement&tag=settings
@@ -67,6 +71,6 @@ The page does not interpret searches as regular expressions or send them to a se
 
 ### Deployment refreshes
 
-The Pages workflow runs after a push to `main`, on a manual workflow dispatch, every hour, and after the `news-publication-refresh` repository-dispatch event. The workflow intentionally ignores dispatch payload fields. The hourly run remains the safety net for scheduled publish and expiry changes while a separate credential decision is needed before MS-News can send a dispatch event.
+The Pages workflow runs after a push to `main`, on a manual workflow dispatch, every hour, and after the `news-publication-refresh` repository-dispatch event. The workflow intentionally ignores dispatch payload fields. One shared concurrency group cancels an older refresh when a newer one arrives, so a delayed scheduled build cannot deploy an older snapshot after a newer push or dispatch. The hourly run remains the safety net for scheduled publish and expiry changes while a separate credential decision is needed before MS-News can send a dispatch event.
 
 Run the deterministic behaviour tests with `npm test`. `npm run astro -- check` runs Astro diagnostics, and `npm run build` performs the sync and static build.

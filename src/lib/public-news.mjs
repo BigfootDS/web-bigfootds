@@ -1,8 +1,8 @@
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
 import { readPublicNewsSnapshot } from '../../scripts/news-publication.mjs';
 
-const snapshotPath = fileURLToPath(new URL('../generated/public-news.json', import.meta.url));
+const snapshotPath = resolve(process.cwd(), 'src/generated/public-news.json');
 
 /**
  * Loads the build-time MS-News snapshot for Astro routes. This module only runs

@@ -1,0 +1,42 @@
+---
+import BlogPost from '../../layouts/BlogPost.astro';
+import { getGeneratedPublicNews } from '../../lib/public-news.mjs';
+
+export async function getStaticPaths() {
+	const posts = await getGeneratedPublicNews();
+
+	return posts.map((post) => ({
+		params: { id: post.id },
+		props: { post },
+	}));
+}
+
+const { post } = Astro.props;
+---
+
+<BlogPost
+	title={post.content.title}
+	description={post.content.summary}
+	pubDate={new Date(post.publishAt)}
+>
+	<p class="news-source">Published from MS-News source <code>{post.id}</code> in {post.content.locale}.</p>
+	<p class="news-tags">{post.tags.map((tag) => <span>#{tag}</span>)}</p>
+	<div class="news-body">{post.content.body}</div>
+</BlogPost>
+
+<style>
+	.news-source,
+	.news-tags {
+		font-size: 0.85em;
+	}
+
+	.news-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+
+	.news-body {
+		white-space: pre-wrap;
+	}
+</style>

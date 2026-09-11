@@ -1,26 +1,31 @@
 ---
+interface Props {
+	heroImage?: string;
+	pubDate?: Date;
+	title?: string;
+	updatedDate?: Date;
+}
 
-const {title, heroImage, pubDate, updatedDate} = Astro.props;
-
-console.log(heroImage);
+const { title, heroImage, pubDate, updatedDate } = Astro.props as Props;
+const article = title && pubDate
+	? {
+		"@context": "https://schema.org",
+		"@type": "NewsArticle",
+		author: [{
+			"@type": "Person",
+			name: "BigfootDS",
+			url: "https://bigfootds.com/about/"
+		}],
+		datePublished: pubDate.toISOString(),
+		...(updatedDate === undefined ? {} : { dateModified: updatedDate.toISOString() }),
+		headline: title,
+		...(heroImage === undefined ? {} : { image: [new URL(heroImage, Astro.site).toString()] })
+	}
+	: undefined;
 ---
 
-<script type="application/ld+json" set:html={JSON.stringify({
-	"@context": "https://schema.org",
-	"@type": "NewsArticle",
-	"headline": title,
-	"image": [
-	new URL(heroImage, "https://bigfootds.com/")
-	 ],
-	"datePublished": pubDate,
-	"dateModified": updatedDate,
-	"author": [
-		  {
-		  "@type": "Person",
-		  "name": "BigfootDS",
-		  "url": "https://bigfootds.com/about/"
-		  }
-	  ]
-  })}>
-	
-</script>
+{
+	article !== undefined && (
+		<script type="application/ld+json" is:inline set:html={JSON.stringify(article)}></script>
+	)
+}

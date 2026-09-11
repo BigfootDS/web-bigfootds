@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+  repository_dispatch:
+    types:
+      - news-publication-refresh
+  schedule:
+    - cron: '17 * * * *'
 
 # Sets permissions missed by the web GUI
 permissions:
@@ -28,15 +34,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'
+          cache: npm
 
-      - name: Build ReactJS app
+      - name: Build static website
         run: |
-          npm install
-          npm run build --if-present
+          npm ci
+          npm run build
         env:
           CI: true
           NODE_ENV: production
-          REACT_APP_SOME_CUSTOM_SECRET: ${{ secrets.SOME_CUSTOM_SECRET }}
+          MS_NEWS_PUBLIC_API_BASE_URL: ${{ vars.MS_NEWS_PUBLIC_API_BASE_URL }}
       
       - name: Log build directory as a sanity check
         run: find -maxdepth 2 -type d -name 'dist'
@@ -46,9 +53,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload ReactJS build folder
+          # Upload Astro build folder
           path: './dist'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-    

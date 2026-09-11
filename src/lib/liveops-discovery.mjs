@@ -8,6 +8,7 @@ const maximumTagCount = 10;
 const maximumTitleLength = 120;
 const cursorPattern = /^[A-Za-z0-9_-]+$/;
 const stableIdentifierPattern = /^[a-z][a-z0-9._-]{0,79}$/;
+const liveOpsConfigTypes = new Set(['content_set', 'event_schedule', 'reward_schedule', 'shop_rotation']);
 
 /**
  * Reads the visitor-controlled, shareable discovery state. This is a small
@@ -20,7 +21,7 @@ const stableIdentifierPattern = /^[a-z][a-z0-9._-]{0,79}$/;
 export function readLiveOpsFilters(searchParams) {
   const q = normaliseQuery(searchParams.get('q'));
   const project = normaliseStableIdentifier(searchParams.get('project'));
-  const type = normaliseStableIdentifier(searchParams.get('type'));
+  const type = normaliseConfigType(searchParams.get('type'));
   const tag = normaliseStableIdentifier(searchParams.get('tag'));
 
   return {
@@ -59,7 +60,7 @@ export function serialiseLiveOpsFilters(filters, cursor = undefined) {
   const parameters = new URLSearchParams();
   const q = normaliseQuery(filters.q ?? null);
   const project = normaliseStableIdentifier(filters.project ?? null);
-  const type = normaliseStableIdentifier(filters.type ?? null);
+  const type = normaliseConfigType(filters.type ?? null);
   const tag = normaliseStableIdentifier(filters.tag ?? null);
 
   if (q !== undefined) parameters.set('q', q);
@@ -171,16 +172,20 @@ function readPublicLiveOpsItem(value, index) {
     throw new Error(`Live Ops catalogue item ${index + 1} contains non-public fields.`);
   }
 
+  const startsAt = readIsoTimestamp(value.startsAt, 'startsAt', index);
   const endsAt = value.endsAt === undefined ? undefined : readIsoTimestamp(value.endsAt, 'endsAt', index);
+  if (endsAt !== undefined && Date.parse(endsAt) <= Date.parse(startsAt)) {
+    throw new Error(`Live Ops catalogue item ${index + 1} ends before it starts.`);
+  }
 
   return {
     id: readStableIdentifier(value.id, 'id', index),
     projectId: readStableIdentifier(value.projectId, 'projectId', index),
-    configType: readStableIdentifier(value.configType, 'configType', index),
+    configType: readConfigType(value.configType, index),
     title: readBoundedText(value.title, 'title', maximumTitleLength, index),
     summary: readBoundedText(value.summary, 'summary', maximumSummaryLength, index),
     tags: readTags(value.tags, index),
-    startsAt: readIsoTimestamp(value.startsAt, 'startsAt', index),
+    startsAt,
     ...(endsAt === undefined ? {} : { endsAt })
   };
 }
@@ -199,6 +204,12 @@ function readBoundedText(value, field, maximumLength, index) {
   }
 
   return value;
+}
+
+function readConfigType(value, index) {
+  const type = normaliseConfigType(value);
+  if (type === undefined) throw new Error(`Live Ops catalogue item ${index + 1} has an invalid configType.`);
+  return type;
 }
 
 function readTags(value, index) {
@@ -237,6 +248,11 @@ function normaliseStableIdentifier(value) {
 
   const normalised = value.normalize('NFKC').trim().toLowerCase();
   return stableIdentifierPattern.test(normalised) ? normalised : undefined;
+}
+
+function normaliseConfigType(value) {
+  const normalised = normaliseStableIdentifier(value);
+  return normalised !== undefined && liveOpsConfigTypes.has(normalised) ? normalised : undefined;
 }
 
 function isRecord(value) {

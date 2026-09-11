@@ -38,6 +38,7 @@ test('reads and serialises bounded, shareable public catalogue filters', () => {
     type: 'event_schedule'
   });
   assert.deepEqual(readLiveOpsFilters(new URLSearchParams('project=../../private&type=not%20valid')), {});
+  assert.deepEqual(readLiveOpsFilters(new URLSearchParams('type=not_a_liveops_type')), {});
   assert.equal(readLiveOpsFilters(new URLSearchParams(`q=${'q'.repeat(MAXIMUM_LIVE_OPS_QUERY_LENGTH + 1)}`)).q.length, MAXIMUM_LIVE_OPS_QUERY_LENGTH);
   assert.equal(
     serialiseLiveOpsFilters(filters, 'cGFnZTox').toString(),
@@ -70,6 +71,14 @@ test('accepts only the small documented public catalogue DTO', () => {
   assert.throws(
     () => readPublicLiveOpsCatalogue({ items: [{ ...publicCatalogue.items[0], configKey: 'internal-key' }] }),
     /non-public fields/
+  );
+  assert.throws(
+    () => readPublicLiveOpsCatalogue({ items: [{ ...publicCatalogue.items[0], configType: 'not_a_liveops_type' }] }),
+    /invalid configType/
+  );
+  assert.throws(
+    () => readPublicLiveOpsCatalogue({ items: [{ ...publicCatalogue.items[0], endsAt: publicCatalogue.items[0].startsAt }] }),
+    /ends before it starts/
   );
   assert.throws(
     () => readPublicLiveOpsCatalogue({ items: Array.from({ length: 101 }, () => publicCatalogue.items[0]) }),

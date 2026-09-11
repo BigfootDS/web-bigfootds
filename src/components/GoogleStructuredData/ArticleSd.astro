@@ -1,29 +1,23 @@
 ---
 import { serialiseJsonForScript } from '../../lib/json-for-script.mjs';
+import { createNewsArticleStructuredData } from '../../lib/news-article-structured-data.mjs';
 
 interface Props {
 	heroImage?: string;
+	isNewsArticle?: boolean;
 	pubDate?: Date;
 	title?: string;
 	updatedDate?: Date;
 }
 
-const { title, heroImage, pubDate, updatedDate } = Astro.props as Props;
-const article = title && pubDate
-	? {
-		"@context": "https://schema.org",
-		"@type": "NewsArticle",
-		author: [{
-			"@type": "Person",
-			name: "BigfootDS",
-			url: "https://bigfootds.com/about/"
-		}],
-		datePublished: pubDate.toISOString(),
-		...(updatedDate === undefined ? {} : { dateModified: updatedDate.toISOString() }),
-		headline: title,
-		...(heroImage === undefined ? {} : { image: [new URL(heroImage, Astro.site).toString()] })
-	}
-	: undefined;
+const { title, heroImage, isNewsArticle, pubDate, updatedDate } = Astro.props as Props;
+const article = createNewsArticleStructuredData({
+	...(heroImage === undefined ? {} : { heroImage: new URL(heroImage, Astro.site).toString() }),
+	isNewsArticle,
+	pubDate,
+	title,
+	updatedDate
+});
 ---
 
 {

@@ -27,6 +27,8 @@ The primary header keeps the current public journeys compact: Home, About, News,
 
 `/projects/` is a static directory rather than a service-backed catalogue. It supports literal title-and-description search, the existing Available now/Coming soon split (derived only from the optional project publication date), and newest, oldest or title sorting. Its state is shareable through `q`, `availability`, and `sort` query parameters. The directory intentionally does not claim technology, brand, platform or richer project-status metadata until those fields exist in the content source.
 
+An optional `featuredOrder` integer on a project entry is an editorial Home-page decision, not a publication state. Home displays the lowest numbered entries first, so an in-development project can be deliberately featured without being labelled available. Keep the values unique and small; the Home layout currently shows its first three entries.
+
 Public Events and public profile lookup remain available from their direct URLs, while staff News administration remains unlinked from public navigation. Forum work is deliberately deferred until MS-Forum has a separately approved runnable service contract.
 
 ## Browser account sessions

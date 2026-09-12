@@ -36,7 +36,7 @@ $env:PUBLIC_MS_AUTH_BASE_URL = 'http://localhost:3000'
 npm run dev
 ```
 
-The production value should derive from the existing canonical GitHub organisation variable `MS_AUTH_BASE_URL`; do not create a second unrelated base-URL variable. The deployed Pages workflow does not inject `PUBLIC_MS_AUTH_BASE_URL` yet, so the current production account page deliberately reports sign-in as unavailable instead of guessing an origin. Releasing it needs an explicitly approved workflow change that maps `PUBLIC_MS_AUTH_BASE_URL` from `vars.MS_AUTH_BASE_URL`, plus an MS-Auth deployment setting of `CORS_ALLOWED_ORIGINS=https://bigfootds.com`. Use the exact HTTPS origin, no wildcard, path, or trailing route. The browser requests omit cookies, disable caching, and use [a no-referrer policy](https://developer.mozilla.org/en-US/docs/Web/Security/Practical_implementation_guides/Referrer_policy).
+The production value derives from the existing canonical GitHub organisation variable `MS_AUTH_BASE_URL`; do not create a second unrelated base-URL variable. The Pages workflow maps it to Astro's public `PUBLIC_MS_AUTH_BASE_URL` build value. MS-Auth still needs the exact deployment value `CORS_ALLOWED_ORIGINS=https://bigfootds.com` before a browser request can succeed. Use the exact HTTPS origin, no wildcard, path, or trailing route. The browser requests omit cookies, disable caching, and use [a no-referrer policy](https://developer.mozilla.org/en-US/docs/Web/Security/Practical_implementation_guides/Referrer_policy).
 
 At this foundation stage, the browser sends a token pair only to MS-Auth:
 
@@ -55,7 +55,7 @@ Do not reuse those header names blindly for another microservice. Each future au
 
 `/account/connections/` is separate because relationships are owned by MS-UserRelations, not profile data. Its requests send the pair in `accessToken` and `refreshToken` headers, without a client `Authorization` header; that service derives the caller through its MS-Auth introspection boundary. The existing relationship API exposes opaque account IDs only. Public profile data intentionally cannot map a display name to such an ID, so friend and block actions require an account ID shared through another agreed product flow. The website does not infer a relationship from a profile or expose a public friends list.
 
-These browser routes fail closed as unavailable until a separately approved Pages workflow change maps the existing canonical organisation variables into `PUBLIC_MS_ACCOUNTS_BASE_URL` and `PUBLIC_MS_USERRELATIONS_BASE_URL`. They are implementation details, not new organisation variables. Before release, set each deployed service's exact `CORS_ALLOWED_ORIGINS` to `https://bigfootds.com`: MS-Accounts needs its separately approved CD environment mapping added, while MS-UserRelations already supports that variable. Keep MS-Auth's exact origin configuration in place as well. All three browser callers omit cookies, use `no-store`, and apply a no-referrer policy.
+These browser routes fail closed as unavailable until the Pages workflow maps the existing canonical organisation variables into `PUBLIC_MS_ACCOUNTS_BASE_URL` and `PUBLIC_MS_USERRELATIONS_BASE_URL`. They are Astro build details, not new organisation variables. Before release, set each deployed service's exact `CORS_ALLOWED_ORIGINS` to `https://bigfootds.com`: MS-Accounts needs its separately approved CD environment mapping added, while MS-UserRelations already supports that variable. Keep MS-Auth's exact origin configuration in place as well. All three browser callers omit cookies, use `no-store`, and apply a no-referrer policy.
 
 ## Build Your Own
 
@@ -78,9 +78,9 @@ This project does have a few other things added to it beyond the basic blog temp
 
 ## Public news publishing
 
-MS-News remains the editorial source of truth. This website turns its public, locale-selected list response into an ignored build-time snapshot, then uses that snapshot to generate static `/news/` pages. Nothing in this repository stores a service token, calls an editorial route, or sends an API request from a visitor's browser.
+MS-News remains the editorial source of truth. This website turns its public, locale-selected list response into an ignored build-time snapshot, then uses that snapshot to generate static `/news/` pages. The public News experience has no browser credentials. The separate staff News composer below makes direct, attested browser requests and never has a service token.
 
-Set the non-secret GitHub organisation or repository variable `MS_NEWS_BASE_URL` to the bare public MS-News HTTP(S) origin. Do not include a path, query, fragment, or credentials. For local work, set the same environment variable before running:
+Set the non-secret GitHub organisation or repository variable `MS_NEWS_BASE_URL` to the bare public MS-News HTTP(S) origin. Do not include a path, query, fragment, or credentials. The Pages workflow uses that one canonical value for both the server-side snapshot sync and Astro's `PUBLIC_MS_NEWS_BASE_URL` staff-composer build value. It is not a second GitHub variable. For local work, set the same environment variable before running:
 
 ```powershell
 npm run news:sync
@@ -97,7 +97,27 @@ The snapshot accepts either a legacy plain-text body or MS-News’ bounded `tipt
 
 Images resolve through MS-News’ public `/api/v1/news/media/{assetId}` delivery route, never a bucket URL stored in a document. The service checks that the opaque asset is still referenced by a currently visible post before creating a short-lived Cloud Storage redirect. A single image remains an ordinary link; galleries work without JavaScript as image links and then enhance into a keyboard-accessible lightbox with thumbnails, zoom, and fullscreen controls. YouTube embeds use the privacy-enhanced `youtube-nocookie.com` host and a validated video ID.
 
-Existing Markdown and MDX files under `src/content/blog/` remain available on their legacy slug routes while historical content is migrated. They are not an alternate authoring path for new MS-News posts. The future staff editor will save documents and upload images through authenticated MS-News editorial routes; it remains a separate task until the direct-client access-and-refresh-token integration is ready. Its Cloud Storage bucket, IAM, CORS, and service environment configuration are operational work and are not created by this static website build.
+Existing Markdown and MDX files under `src/content/blog/` remain available on their legacy slug routes while historical content is migrated. They are not an alternate authoring path for new MS-News posts. The staff editor saves new structured documents and uploads images through authenticated MS-News editorial routes. Its Cloud Storage bucket, IAM, CORS, and service environment configuration are operational work, not something created by this static website build.
+
+### Staff News administration
+
+`/admin/news/` is the staff list and `/admin/news/editor/` is the WYSIWYG composer. They are deliberately not linked in the public header or News pages. Both routes are static shells, so they are not the authorisation boundary. The shell immediately verifies the token pair in browser storage with MS-Auth, then MS-News asks MS-Auth to attest the human bearer token for every list, read, edit, publication, and media request. A visitor without a current staff session receives no draft content, metadata, upload intent, or media capability.
+
+The composer uses Tiptap for normal text editing, but it serialises only the small MS-News document format. That means headings, paragraphs, lists, quotes, links, rules, verified images, ordered image galleries, and YouTube IDs are supported. Raw HTML, MDX, arbitrary iframes, arbitrary image URLs, base64 content, and browser-authored publication state are not. MS-News remains the source of truth for drafts, publication status, media readiness, and immutable staff audit history.
+
+Browser requests use `Authorization: Bearer <access token>`, `accessToken`, and `refreshToken` headers with cookies omitted, no-store caching, and a no-referrer policy. The component verifies first and retries one request after an MS-News `401` or `403`, so a renewable browser session does not interrupt an editor. No signed media URL is stored in a post, in browser storage, or in a generated public page.
+
+An image upload has three steps: the staff browser requests one MS-News upload intent, posts the image form directly to the private bucket, then asks MS-News to inspect and finalise it. Only a JPEG, PNG, or WebP image up to 10 MiB can reach that flow. After verification, the browser fetches the attested staff preview route and retains its returned blob URL in memory. The public website uses the separate visibility-gated MS-News media route after a post is published.
+
+Before enabling browser media uploads in a deployed environment, configure the following operational pieces:
+
+1. Create a private Google Cloud Storage bucket with Uniform Bucket-Level Access and Public Access Prevention enabled. Do not grant `allUsers` object access or create a static service-account key.
+2. Give the MS-News Cloud Run runtime identity only the bucket object permissions it needs to write, inspect, and read its own `news-media/` objects, plus the identity permission needed to create V4 signed POST and read URLs. Review this against [Cloud Storage signed URL guidance](https://cloud.google.com/storage/docs/access-control/signed-urls).
+3. Set the existing non-secret `NEWS_MEDIA_GCS_BUCKET` service environment value and map it through the MS-News Cloud Run deployment. The service should continue to fail closed when that value is absent.
+4. Apply a bucket CORS policy for exactly `https://bigfootds.com` (and a deliberately chosen loopback development origin only when needed), allowing `POST` for signed form uploads and `GET` for the short-lived preview read. Do not use `*`, credentials, or broad custom headers. The service itself also needs `CORS_ALLOWED_ORIGINS=https://bigfootds.com` for the editor's MS-News calls.
+5. Add a lifecycle rule for unverified staging objects and verify that anonymous bucket listing and reads fail. Then test an attested staff upload, a draft preview, a published image, and an unpublished image separately.
+
+The public News build is still server-to-server and does not need browser CORS. The staff composer does, so keep the two paths distinct when diagnosing a deployment.
 
 ### Search and filters
 

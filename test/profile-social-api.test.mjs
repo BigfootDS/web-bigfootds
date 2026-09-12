@@ -104,15 +104,15 @@ test('uses MS-UserRelations documented pair headers without a client bearer head
 
 test('accepts bounded opaque relationship data without profile fields', () => {
   assert.deepEqual(readRelationshipSummary({
-    blocks: 1,
-    friends: 2,
-    incomingFriendRequests: 3,
-    outgoingFriendRequests: 4
+    activeBlockCount: 1,
+    incomingPendingCount: 3,
+    outgoingPendingCount: 4,
+    visibleFriendCount: 2
   }), {
-    blocks: 1,
-    friends: 2,
-    incomingFriendRequests: 3,
-    outgoingFriendRequests: 4
+    activeBlockCount: 1,
+    incomingPendingCount: 3,
+    outgoingPendingCount: 4,
+    visibleFriendCount: 2
   });
   assert.deepEqual(readRelationshipPage({ hasMore: false, items: [{ friendAuthUserId: 'opaque-user' }], nextCursor: null }, 'friendAuthUserId'), [{ id: 'opaque-user' }]);
   assert.throws(() => readRelationshipPage({ hasMore: false, items: [{ displayName: 'not allowed' }], nextCursor: null }, 'friendAuthUserId'), isInvalidResponseError);

@@ -137,6 +137,7 @@ export default function AccountProfilePanel({ apiBaseUrl }) {
 
 function readUpdateInput(formData) {
   const socialLinks = parseSocialLinks(String(formData.get('socialLinks') ?? ''));
+  const tag = readText(formData, 'tag', 4);
   return {
     biography: readText(formData, 'biography', 190),
     displayName: readRequiredText(formData, 'displayName'),
@@ -144,7 +145,7 @@ function readUpdateInput(formData) {
     profilePictureBackgroundUrl: readOptionalUrl(formData, 'profilePictureBackgroundUrl'),
     profilePictureForegroundUrl: readOptionalUrl(formData, 'profilePictureForegroundUrl'),
     socialLinks,
-    tag: readText(formData, 'tag', 4)
+    ...(tag ? { tag } : {})
   };
 }
 

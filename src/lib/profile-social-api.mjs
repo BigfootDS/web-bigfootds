@@ -144,7 +144,7 @@ export function readRelationshipPage(value, idField) {
 export function readRelationshipSummary(value) {
   if (!isRecord(value)) throw new ProfileSocialApiError('invalid-response');
   const counts = {};
-  for (const key of ['friends', 'incomingFriendRequests', 'outgoingFriendRequests', 'blocks']) {
+  for (const key of ['visibleFriendCount', 'incomingPendingCount', 'outgoingPendingCount', 'activeBlockCount']) {
     if (typeof value[key] !== 'number' || !Number.isSafeInteger(value[key]) || value[key] < 0) {
       throw new ProfileSocialApiError('invalid-response');
     }

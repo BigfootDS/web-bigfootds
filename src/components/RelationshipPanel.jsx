@@ -47,8 +47,8 @@ export default function RelationshipPanel({ apiBaseUrl }) {
       setData({
         blocks: readRelationshipPage(blocks, 'blockedAuthUserId'),
         friends: readRelationshipPage(friends, 'friendAuthUserId'),
-        incoming: readRelationshipPage(incoming, 'requesterAuthUserId'),
-        outgoing: readRelationshipPage(outgoing, 'recipientAuthUserId'),
+        incoming: readRelationshipPage(incoming, 'targetAuthUserId'),
+        outgoing: readRelationshipPage(outgoing, 'targetAuthUserId'),
         summary: readRelationshipSummary(summary)
       });
       setStatus('Your connection lists are up to date.');
@@ -118,16 +118,27 @@ export default function RelationshipPanel({ apiBaseUrl }) {
 function RelationshipLists({ data, onCommand }) {
   return <>
     <dl className="relationship-summary">
-      <div><dt>Friends</dt><dd>{data.summary.friends}</dd></div>
-      <div><dt>Incoming requests</dt><dd>{data.summary.incomingFriendRequests}</dd></div>
-      <div><dt>Outgoing requests</dt><dd>{data.summary.outgoingFriendRequests}</dd></div>
-      <div><dt>Blocked accounts</dt><dd>{data.summary.blocks}</dd></div>
+      <div><dt>Friends</dt><dd>{data.summary.visibleFriendCount}</dd></div>
+      <div><dt>Incoming requests</dt><dd>{data.summary.incomingPendingCount}</dd></div>
+      <div><dt>Outgoing requests</dt><dd>{data.summary.outgoingPendingCount}</dd></div>
+      <div><dt>Blocked accounts</dt><dd>{data.summary.activeBlockCount}</dd></div>
     </dl>
     <RelationshipList title="Friends" entries={data.friends} actionLabel="Remove" onAction={(id) => onCommand('DELETE', `/api/v1/relationships/friends/${encodeURIComponent(id)}`)} />
-    <RelationshipList title="Incoming requests" entries={data.incoming} actionLabel="Accept" onAction={(id) => onCommand('POST', `/api/v1/relationships/friend-requests/${encodeURIComponent(id)}/respond`, { action: 'accept' })} />
+    <IncomingRequestList entries={data.incoming} onCommand={onCommand} />
     <RelationshipList title="Outgoing requests" entries={data.outgoing} actionLabel="Cancel" onAction={(id) => onCommand('DELETE', `/api/v1/relationships/friend-requests/${encodeURIComponent(id)}`)} />
     <RelationshipList title="Blocked accounts" entries={data.blocks} actionLabel="Unblock" onAction={(id) => onCommand('DELETE', `/api/v1/relationships/blocks/${encodeURIComponent(id)}`)} />
   </>;
+}
+
+function IncomingRequestList({ entries, onCommand }) {
+  return <section aria-labelledby="relationship-incoming-requests">
+    <h2 id="relationship-incoming-requests">Incoming requests</h2>
+    {entries.length === 0 ? <p>None.</p> : <ul>{entries.map((entry) => <li key={entry.id}>
+      <code>{entry.id}</code>{' '}
+      <button type="button" onClick={() => onCommand('POST', `/api/v1/relationships/friend-requests/${encodeURIComponent(entry.id)}/respond`, { action: 'accept' })}>Accept</button>{' '}
+      <button type="button" onClick={() => onCommand('POST', `/api/v1/relationships/friend-requests/${encodeURIComponent(entry.id)}/respond`, { action: 'decline' })}>Decline</button>
+    </li>)}</ul>}
+  </section>;
 }
 
 function RelationshipList({ title, entries, actionLabel, onAction }) {

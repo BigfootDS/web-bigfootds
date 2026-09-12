@@ -38,6 +38,26 @@ test('maps a reset-request rejection to safe validation copy without server deta
   expect(screen.queryByText('private account detail')).toBeNull();
 });
 
+test('shows a safe unavailable state when MS-Auth cannot be reached', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('private network detail'); }));
+  render(<PasswordResetRequestPanel apiBaseUrl={apiBaseUrl} />);
+
+  fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'player@example.com' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Email password-reset link' }));
+
+  expect(await screen.findByText('Password reset is not available right now. Please try again later.')).toBeTruthy();
+  expect(screen.queryByText('private network detail')).toBeNull();
+});
+
+test('offers a new-link path when no valid reset fragment exists', () => {
+  window.history.replaceState(null, '', '/account/reset-password/');
+  render(<PasswordResetPanel apiBaseUrl={apiBaseUrl} />);
+
+  expect(screen.getByRole('heading', { name: 'Request a new reset link' })).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Request a password-reset link' }).getAttribute('href'))
+    .toBe('/account/forgot-password/');
+});
+
 test('strips a valid reset fragment before rendering and keeps it out of UI text', async () => {
   window.history.replaceState(null, '', `/account/reset-password/#token=${resetToken}`);
   vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })));

@@ -75,7 +75,7 @@ export function serialiseLiveOpsFilters(filters, cursor = undefined) {
  * public environment value from smuggling credentials or a different route
  * into each visitor request.
  *
- * @param {string | undefined} publicApiBaseUrl - `PUBLIC_EVENTS_API_BASE_URL` value.
+ * @param {string | undefined} publicApiBaseUrl - Derived `PUBLIC_MS_LIVEOPSCONFIG_BASE_URL` browser-build value.
  * @param {{ project?: string, q?: string, tag?: string }} filters - Valid filter state.
  * @param {string | undefined} [cursor] - Opaque continuation cursor.
  * @returns {URL} Service URL for the public events endpoint.
@@ -154,14 +154,14 @@ export function readPublicLiveOpsCatalogue(value) {
 
 function readPublicApiOrigin(value) {
   if (typeof value !== 'string' || value.trim() === '') {
-    throw new Error('Set PUBLIC_EVENTS_API_BASE_URL to the public events API origin before browsing events.');
+    throw new Error('PUBLIC_MS_LIVEOPSCONFIG_BASE_URL is required before browsing events.');
   }
 
   let url;
   try {
     url = new URL(value.trim());
   } catch {
-    throw new Error('PUBLIC_EVENTS_API_BASE_URL must be a bare HTTP(S) origin.');
+    throw new Error('PUBLIC_MS_LIVEOPSCONFIG_BASE_URL must be a bare HTTP(S) origin.');
   }
 
   const localHttp = url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1');
@@ -171,7 +171,7 @@ function readPublicApiOrigin(value) {
     || url.pathname !== '/'
     || url.search !== ''
     || url.hash !== '') {
-    throw new Error('PUBLIC_EVENTS_API_BASE_URL must be a bare HTTPS origin, or HTTP localhost for local development.');
+    throw new Error('PUBLIC_MS_LIVEOPSCONFIG_BASE_URL must be a bare HTTPS origin, or HTTP localhost for local development.');
   }
 
   return url.origin;

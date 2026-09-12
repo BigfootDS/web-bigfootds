@@ -55,6 +55,7 @@ test('builds an anonymous public catalogue request from a bare public origin', (
   }, 'cGFnZTox');
 
   assert.equal(url.toString(), `https://liveops.bigfootds.dev/api/v1/events?q=Spring&project=thebestestbeehive&tag=event&cursor=cGFnZTox&limit=${LIVE_OPS_PAGE_SIZE}`);
+  assert.throws(() => createLiveOpsCatalogueUrl(undefined, {}), /PUBLIC_MS_LIVEOPSCONFIG_BASE_URL is required/);
   assert.throws(() => createLiveOpsCatalogueUrl('https://user:pass@liveops.bigfootds.dev', {}), /bare HTTPS origin/);
   assert.throws(() => createLiveOpsCatalogueUrl('https://liveops.bigfootds.dev/api', {}), /bare HTTPS origin/);
   assert.equal(createLiveOpsCatalogueUrl('http://127.0.0.1:8080', {}).origin, 'http://127.0.0.1:8080');

@@ -46,8 +46,8 @@ jobs:
         env:
           CI: true
           NODE_ENV: production
-          MS_NEWS_PUBLIC_API_BASE_URL: ${{ vars.MS_NEWS_PUBLIC_API_BASE_URL }}
-          PUBLIC_EVENTS_API_BASE_URL: ${{ vars.PUBLIC_EVENTS_API_BASE_URL }}
+          MS_NEWS_BASE_URL: ${{ vars.MS_NEWS_BASE_URL }}
+          PUBLIC_MS_LIVEOPSCONFIG_BASE_URL: ${{ vars.MS_LIVEOPSCONFIG_BASE_URL }}
       
       - name: Log build directory as a sanity check
         run: find -maxdepth 2 -type d -name 'dist'

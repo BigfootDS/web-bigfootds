@@ -54,7 +54,7 @@
 		title: string;
 	};
 
-	const apiBaseUrl = import.meta.env.PUBLIC_EVENTS_API_BASE_URL;
+	const apiBaseUrl = import.meta.env.PUBLIC_MS_LIVEOPSCONFIG_BASE_URL;
 	const requestCoordinator = createLatestLiveOpsRequestCoordinator();
 	let requestController: AbortController | undefined;
 	let nextCursor: string | undefined;

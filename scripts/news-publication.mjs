@@ -2,7 +2,7 @@ import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 export const DEFAULT_NEWS_LOCALE = 'en-AU';
-export const NEWS_API_BASE_URL_ENVIRONMENT_VARIABLE = 'MS_NEWS_PUBLIC_API_BASE_URL';
+export const NEWS_API_BASE_URL_ENVIRONMENT_VARIABLE = 'MS_NEWS_BASE_URL';
 const NEWS_LIST_PATH = '/api/v1/news';
 const MAXIMUM_PAGE_COUNT = 1_000;
 const MAXIMUM_PAGE_SIZE = 50;

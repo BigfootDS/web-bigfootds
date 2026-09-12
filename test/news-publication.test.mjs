@@ -45,7 +45,7 @@ test('requires a bare public MS-News HTTP(S) origin', () => {
   assert.equal(readNewsApiBaseUrl('https://news.example.test/'), 'https://news.example.test');
   assert.throws(
     () => readNewsApiBaseUrl(undefined),
-    /MS_NEWS_PUBLIC_API_BASE_URL is required/
+    /MS_NEWS_BASE_URL is required/
   );
   assert.throws(
     () => readNewsApiBaseUrl('https://news.example.test/api/v1/news'),

@@ -44,7 +44,7 @@ This project does have a few other things added to it beyond the basic blog temp
 
 MS-News remains the editorial source of truth. This website turns its public, locale-selected list response into an ignored build-time snapshot, then uses that snapshot to generate static `/news/` pages. Nothing in this repository stores a service token, calls an editorial route, or sends an API request from a visitor's browser.
 
-Set the non-secret GitHub Actions repository variable `MS_NEWS_PUBLIC_API_BASE_URL` to the bare public MS-News HTTP(S) origin. Do not include a path, query, fragment, or credentials. For local work, set the same environment variable before running:
+Set the non-secret GitHub organisation or repository variable `MS_NEWS_BASE_URL` to the bare public MS-News HTTP(S) origin. Do not include a path, query, fragment, or credentials. For local work, set the same environment variable before running:
 
 ```powershell
 npm run news:sync
@@ -79,7 +79,7 @@ Run the deterministic behaviour tests with `npm test`. `npm run astro -- check` 
 
 LiveOps is an internal staff term, not player-facing website language. The `/events/` page asks MS-LiveOpsConfig for an opt-in list of currently active public events. It never receives generic configuration payloads, configuration keys, revision IDs, content hashes, staff identities, reward schedules, shop rotations, content sets, or browser credentials.
 
-Set the non-secret public deployment variable `PUBLIC_EVENTS_API_BASE_URL` to the bare public MS-LiveOpsConfig HTTP(S) origin. The page makes no request when that value is absent, then shows a simple unavailable state instead of guessing a service URL. For local work, a bare `http://localhost:<port>` or `http://127.0.0.1:<port>` origin is also allowed.
+Set the non-secret GitHub organisation or repository variable `MS_LIVEOPSCONFIG_BASE_URL` to the bare public MS-LiveOpsConfig HTTP(S) origin. The Pages workflow maps it to `PUBLIC_MS_LIVEOPSCONFIG_BASE_URL` only for Astro's browser build, because Astro exposes only `PUBLIC_`-prefixed values to browser code. It is not a second GitHub variable. For local browser work, set `PUBLIC_MS_LIVEOPSCONFIG_BASE_URL` to a bare `http://localhost:<port>` or `http://127.0.0.1:<port>` origin. The page makes no request when the value is absent, then shows a simple unavailable state instead of guessing a service URL.
 
 The event list stays live in the browser because an active window can start or finish at any UTC instant. Visitors can share a literal title-and-summary search plus project and tag filters in the page URL:
 

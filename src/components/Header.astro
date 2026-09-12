@@ -1,168 +1,157 @@
 ---
-import HeaderLink from './HeaderLink.astro';
+import { Image } from 'astro:assets';
+
 import { SITE_TITLE } from '../consts';
-// import AccountHeaderWidget from './AccountHeaderWidget.astro';
-import {Image} from "astro:assets";
-import logo from "../assets/images/BigfootDSLogo_512.png";
+import { PRIMARY_NAVIGATION_LINKS } from '../lib/primary-navigation.mjs';
+import logo from '../assets/images/BigfootDSLogo_512.png';
+import HeaderLink from './HeaderLink.astro';
 ---
 
 <header>
-	<nav>
+	<nav aria-label="Primary navigation">
 		<div class="site-title">
 			<a href="/">
-				<Image loading={"eager"} class="headerLogo" alt="BigfootDS logo" src={logo} />
-				<h2>
-					{SITE_TITLE}
-				</h2>
+				<Image loading="eager" class="header-logo" alt="BigfootDS logo" src={logo} />
+				<span>{SITE_TITLE}</span>
 			</a>
 		</div>
-		<div class="internal-links">
-			<HeaderLink href="/">Home</HeaderLink>
-			<HeaderLink href="/about">About</HeaderLink>
-			<HeaderLink href="/news">News</HeaderLink>
-			<HeaderLink href="/events">Events</HeaderLink>
-			<HeaderLink href="/projects">Projects</HeaderLink>
-			<HeaderLink href="/profiles">Profiles</HeaderLink>
-			<HeaderLink href="/account">Account</HeaderLink>
-
+		<button
+			class="navigation-toggle"
+			type="button"
+			aria-controls="primary-navigation-links"
+			aria-expanded="true"
+		>
+			Menu
+		</button>
+		<div id="primary-navigation-links" class="internal-links" data-navigation-links>
+			{PRIMARY_NAVIGATION_LINKS.map(({ href, label }) => <HeaderLink href={href}>{label}</HeaderLink>)}
 		</div>
-		<!-- <AccountHeaderWidget /> -->
 	</nav>
 </header>
+
+<script>
+	const navigation = document.querySelector<HTMLElement>('[data-navigation-links]');
+	const toggle = document.querySelector<HTMLButtonElement>('.navigation-toggle');
+
+	if (navigation !== null && toggle !== null) {
+		navigation.dataset.state = 'collapsed';
+		toggle.setAttribute('aria-expanded', 'false');
+
+		toggle.addEventListener('click', () => {
+			const expanded = navigation.dataset.state === 'expanded';
+			navigation.dataset.state = expanded ? 'collapsed' : 'expanded';
+			toggle.setAttribute('aria-expanded', String(!expanded));
+		});
+	}
+</script>
+
 <style>
 	header {
-		nav {
-			
-			div {
-				display: flex;
-				justify-content: center;
-				align-items: center;
-
-				
-			}
-
-			.site-title {
-				a {
-					width: 100%;
-					height: 100%;
-					display: flex;
-					justify-content: center;
-					align-items: center;
-				}
-
-				.headerLogo {
-					max-height: 5vh;
-					max-width: 5vh;
-				}
-			}
-
-			.internal-links {
-				width: 33%;
-			}
-		}
-	}
-
-	header {
-		margin: 0;
-		padding: 0 1em;
-		background: light-dark(white, var(--theme-950));
-		box-shadow: 0 2px 8px rgba(var(--black), 5%);
 		position: sticky;
 		z-index: 1;
 		top: 0;
-	}
-	h2 {
 		margin: 0;
-		font-size: 1em;
+		padding: 0 1rem;
+		background: light-dark(white, var(--theme-950));
+		box-shadow: 0 2px 8px rgba(var(--black), 5%);
+	}
+
+	nav {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 1rem;
+		min-height: 4.5rem;
+		max-width: 1200px;
+		margin: 0 auto;
+	}
+
+	.site-title a {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 0;
+		color: light-dark(var(--theme-950), var(--theme-100));
+		font-size: 1rem;
+		font-weight: 700;
+		text-decoration: none;
+		white-space: nowrap;
+	}
+
+	.header-logo {
+		width: 2.5rem;
+		height: 2.5rem;
+		object-fit: contain;
 	}
 
 	.internal-links {
 		display: flex;
-		flex-wrap: wrap;
-		flex-direction: row;
-		width: 50%;
-		justify-content: space-between;
-		justify-items: stretch;
 		align-items: center;
+		justify-content: flex-end;
+		gap: 0.25rem;
+		min-width: 0;
+	}
 
-		a {
-			width: 20%;
-			text-align: center;
+	.internal-links :global(a) {
+		padding: 1rem 0.6rem 0.75rem;
+		color: light-dark(var(--theme-950), var(--theme-100));
+		border-bottom: 4px solid transparent;
+		text-align: center;
+		text-decoration: none;
+		white-space: nowrap;
+	}
+
+	.internal-links :global(a.active) {
+		border-bottom-color: light-dark(var(--theme-950), var(--theme-100));
+		font-weight: 700;
+		text-decoration: none;
+	}
+
+	.navigation-toggle {
+		display: none;
+		min-height: 2.75rem;
+		padding: 0.5rem 0.75rem;
+		font: inherit;
+	}
+
+	@media (max-width: 800px) {
+		nav {
+			grid-template-columns: minmax(0, 1fr) auto;
+			gap: 0.5rem;
+		}
+
+		.navigation-toggle {
+			display: block;
+		}
+
+		.internal-links {
+			grid-column: 1 / -1;
+			align-items: stretch;
+			flex-direction: column;
+			gap: 0;
+			padding-bottom: 0.75rem;
+		}
+
+		.internal-links[data-state='collapsed'] {
+			display: none;
+		}
+
+		.internal-links :global(a) {
+			padding: 0.6rem;
+			border-bottom-width: 0;
+			border-left: 4px solid transparent;
+			text-align: left;
+		}
+
+		.internal-links :global(a.active) {
+			border-bottom-color: transparent;
+			border-left-color: light-dark(var(--theme-950), var(--theme-100));
 		}
 	}
 
-	h2 a,
-	h2 a.active {
-		text-decoration: none;
-	}
-	nav {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-
-
-	}
-	nav a {
-		padding: 1em 0.5em;
-		color: light-dark(var(--theme-950), var(--theme-100));
-		border-bottom: 4px solid transparent;
-		text-decoration: none;
-	}
-	nav a.active {
-		text-decoration: none;
-		border-bottom-color: light-dark(var(--theme-950), var(--theme-100));
-	}
-	.social-links,
-	.social-links a {
-		display: flex;
-	}
-	@media (max-width: 720px) {
-		header {
-			nav {
-
-				.headerLogo {
-					max-height: auto;
-				}
-
-				.site-title {
-					/* width: 20%; */
-					a {
-						padding: 0;
-						h2 {
-							display: none;
-						}
-						flex-wrap: wrap;
-					}
-				}
-				.account-header-widget {
-					width: 20%;
-				}
-
-				.social-links {
-					display: none;
-				}
-
-				width: 100%;
-				padding: 0;
-
-				div {
-					flex-direction: column;
-					
-				}
-
-				.internal-links {
-					display: flex;
-					flex-wrap: wrap;
-					flex-direction: row;
-					width: auto;
-					justify-content: space-evenly;
-					a {
-						width: 45%;
-						padding: 0.1em;
-					}
-				}
-			}
-			
+	@media (min-width: 801px) {
+		.internal-links[data-state='collapsed'] {
+			display: flex;
 		}
 	}
 </style>

@@ -33,7 +33,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.7.2",
-    "@iconify-json/simple-icons": "^1.2.16"
+    "@iconify-json/simple-icons": "^1.2.16",
+    "yet-another-react-lightbox": "^3.32.2"
   },
   "devDependencies": {
     

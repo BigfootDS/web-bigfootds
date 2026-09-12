@@ -82,6 +82,36 @@ test('pages, validates, and sorts public locale-selected news deterministically'
   assert.equal(snapshot.version, 2);
 });
 
+test('derives a rich post snapshot body only from the validated document', async () => {
+  const snapshot = await fetchPublicNews({
+    apiBaseUrl: 'https://news.example.test',
+    fetchImpl: async () => new Response(JSON.stringify(page([
+      publicPost(firstId, {
+        content: {
+          body: 'Untrusted duplicate body',
+          document: {
+            content: [{
+              content: [{ text: 'Safe static announcement', type: 'text' }],
+              type: 'paragraph'
+            }, {
+              attrs: {
+                alt: 'A verified release screenshot',
+                assetId: 'nma_0123456789abcdef0123456789abcdef'
+              },
+              type: 'image'
+            }],
+            format: 'tiptap-json-v1',
+            type: 'doc'
+          }
+        }
+      })
+    ])), { status: 200 })
+  });
+
+  assert.equal(snapshot.posts[0].content.body, 'Safe static announcement A verified release screenshot');
+  assert.equal(snapshot.posts[0].content.document?.format, 'tiptap-json-v1');
+});
+
 test('fails rather than publishing malformed, duplicated, or looping public data', async () => {
   await assert.rejects(
     fetchPublicNews({
@@ -99,6 +129,23 @@ test('fails rather than publishing malformed, duplicated, or looping public data
       fetchImpl: async () => new Response(JSON.stringify(page([], 'same-cursor')), { status: 200 })
     }),
     /repeated public news cursor/
+  );
+  await assert.rejects(
+    fetchPublicNews({
+      apiBaseUrl: 'https://news.example.test',
+      fetchImpl: async () => new Response(JSON.stringify(page([
+        publicPost(firstId, {
+          content: {
+            document: {
+              content: [{ attrs: { src: 'https://untrusted.example/image.png' }, type: 'image' }],
+              format: 'tiptap-json-v1',
+              type: 'doc'
+            }
+          }
+        })
+      ])), { status: 200 })
+    }),
+    /unexpected rich content field/
   );
 });
 

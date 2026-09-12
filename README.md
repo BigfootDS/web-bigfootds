@@ -55,6 +55,14 @@ npm run build
 
 The build request is server-to-server, so MS-News does not need a browser CORS origin for this particular path. Keep `CORS_ALLOWED_ORIGINS` limited to actual browser callers. If a later approved feature adds browser API calls, add the exact website origin to that service's deployment configuration at that time.
 
+### Rich articles and media
+
+The snapshot accepts either a legacy plain-text body or MS-News’ bounded `tiptap-json-v1` document format. The website validates that document independently before rendering it: it permits only the documented headings, paragraphs, lists, quotes, horizontal rules, text marks, verified image references, image galleries, and YouTube video IDs. It does not interpret article HTML, arbitrary image URLs, base64 data, or arbitrary embeds.
+
+Images resolve through MS-News’ public `/api/v1/news/media/{assetId}` delivery route, never a bucket URL stored in a document. The service checks that the opaque asset is still referenced by a currently visible post before creating a short-lived Cloud Storage redirect. A single image remains an ordinary link; galleries work without JavaScript as image links and then enhance into a keyboard-accessible lightbox with thumbnails, zoom, and fullscreen controls. YouTube embeds use the privacy-enhanced `youtube-nocookie.com` host and a validated video ID.
+
+Existing Markdown and MDX files under `src/content/blog/` remain available on their legacy slug routes while historical content is migrated. They are not an alternate authoring path for new MS-News posts. The future staff editor will save documents and upload images through authenticated MS-News editorial routes; it remains a separate task until the direct-client access-and-refresh-token integration is ready. Its Cloud Storage bucket, IAM, CORS, and service environment configuration are operational work and are not created by this static website build.
+
 ### Search and filters
 
 The static news page offers literal, case-insensitive browser search across the published title and summary, plus project, category, and tag filters. Article bodies are intentionally excluded from the discovery payload and remain only on individual static article pages. MS-News can still search public title, summary, and body through its server-side `q` contract for a later approved dynamic consumer.

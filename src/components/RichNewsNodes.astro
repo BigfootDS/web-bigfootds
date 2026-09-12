@@ -1,0 +1,113 @@
+---
+import NewsImageGallery from './NewsImageGallery.jsx';
+import RichNewsNodeList from './RichNewsNodes.astro';
+import RichNewsText from './RichNewsText.jsx';
+import { createNewsMediaDeliveryUrl } from '../lib/news-rich-document.mjs';
+
+type RichNewsNode = import('../lib/news-rich-document.mjs').RichNewsNode;
+
+interface Props {
+	mediaDeliveryBaseUrl: string;
+	nodes: readonly RichNewsNode[];
+}
+
+const { mediaDeliveryBaseUrl, nodes }: Props = Astro.props;
+
+function imageSource(assetId: string) {
+	return createNewsMediaDeliveryUrl(mediaDeliveryBaseUrl, assetId);
+}
+
+function youtubeSource(videoId: string, startAt: number | undefined) {
+	const parameters = new URLSearchParams({
+		modestbranding: '1',
+		rel: '0'
+	});
+	if (startAt !== undefined) {
+		parameters.set('start', String(startAt));
+	}
+	return 'https://www.youtube-nocookie.com/embed/' + videoId + '?' + parameters.toString();
+}
+---
+
+{nodes.map((node) => {
+	switch (node.type) {
+		case 'paragraph':
+			return <p>{node.content.map((entry) => <RichNewsText {...entry} />)}</p>;
+		case 'heading':
+			if (node.attrs.level === 2) return <h2>{node.content.map((entry) => <RichNewsText {...entry} />)}</h2>;
+			if (node.attrs.level === 3) return <h3>{node.content.map((entry) => <RichNewsText {...entry} />)}</h3>;
+			return <h4>{node.content.map((entry) => <RichNewsText {...entry} />)}</h4>;
+		case 'bulletList':
+			return <ul><RichNewsNodeList mediaDeliveryBaseUrl={mediaDeliveryBaseUrl} nodes={node.content} /></ul>;
+		case 'orderedList':
+			return <ol start={node.attrs?.start}><RichNewsNodeList mediaDeliveryBaseUrl={mediaDeliveryBaseUrl} nodes={node.content} /></ol>;
+		case 'listItem':
+			return <li><RichNewsNodeList mediaDeliveryBaseUrl={mediaDeliveryBaseUrl} nodes={node.content} /></li>;
+		case 'blockquote':
+			return <blockquote><RichNewsNodeList mediaDeliveryBaseUrl={mediaDeliveryBaseUrl} nodes={node.content} /></blockquote>;
+		case 'horizontalRule':
+			return <hr />;
+		case 'image': {
+			const source = imageSource(node.attrs.assetId);
+			return (
+				<figure class="news-image">
+					<a href={source}>
+						<img alt={node.attrs.alt} loading="lazy" src={source} />
+					</a>
+					{node.attrs.caption === undefined ? null : <figcaption>{node.attrs.caption}</figcaption>}
+				</figure>
+			);
+		}
+		case 'imageGallery': {
+			const images = node.content.map((image) => ({
+				...(image.attrs.caption === undefined ? {} : { caption: image.attrs.caption }),
+				alt: image.attrs.alt,
+				src: imageSource(image.attrs.assetId)
+			}));
+			return <NewsImageGallery client:visible images={images} layout={node.attrs.layout} />;
+		}
+		case 'youtube':
+			return (
+				<div class="news-youtube">
+					<iframe
+						allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+						allowfullscreen
+						loading="lazy"
+						referrerpolicy="strict-origin-when-cross-origin"
+						src={youtubeSource(node.attrs.videoId, node.attrs.startAt)}
+						title="Embedded YouTube video"
+					></iframe>
+				</div>
+			);
+		default:
+			throw new Error('A non-normalised rich node reached the Astro renderer.');
+	}
+})}
+
+<style>
+	.news-image {
+		margin-block: 2rem;
+	}
+
+	.news-image img {
+		display: block;
+		height: auto;
+		max-width: 100%;
+	}
+
+	.news-image figcaption {
+		font-size: 0.9rem;
+		margin-top: 0.5rem;
+	}
+
+	.news-youtube {
+		aspect-ratio: 16 / 9;
+		margin-block: 2rem;
+	}
+
+	.news-youtube iframe {
+		border: 0;
+		height: 100%;
+		width: 100%;
+	}
+</style>

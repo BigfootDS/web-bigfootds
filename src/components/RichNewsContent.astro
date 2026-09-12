@@ -1,0 +1,9 @@
+---
+import RichNewsNodes from './RichNewsNodes.astro';
+
+const { document, mediaDeliveryBaseUrl } = Astro.props;
+---
+
+<article class="rich-news-content">
+	<RichNewsNodes mediaDeliveryBaseUrl={mediaDeliveryBaseUrl} nodes={document.content} />
+</article>

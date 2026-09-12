@@ -65,6 +65,12 @@ This project is based on the "Astro Starter Kit: Blog" project template. Make yo
 npm create astro@latest -- --template blog
 ```
 
+## Local development requirements
+
+The current Astro 7 toolchain requires Node.js 22.12 or newer and npm 9.6.5 or newer. The deployment workflow uses the current Node LTS release, so use a matching or newer local runtime before installing dependencies.
+
+Start from the lockfile with `npm ci`. Then run `npm test` for the Node and component suites. `npm run build` needs the documented non-secret public service origins because it refreshes the News and Event snapshots before generating static pages.
+
 Features:
 
 - ✅ Minimal styling (make it your own!)

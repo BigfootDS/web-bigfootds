@@ -61,6 +61,24 @@ test('does not render a new-draft editor when no stored staff session exists', a
   expect(screen.queryByLabelText('Article')).toBeNull();
 });
 
+test('renders the new-draft composer only after MS-Auth verifies the stored session', async () => {
+  window.localStorage.setItem(BROWSER_AUTH_SESSION_STORAGE_KEY, JSON.stringify({
+    accessToken: 'access.initial',
+    refreshToken: 'refresh.current'
+  }));
+  vi.stubGlobal('fetch', vi.fn(async (input) => {
+    const url = new URL(input);
+    if (url.origin !== authBaseUrl) throw new Error('New drafts must not fetch an editorial record.');
+    return json({ accessToken: 'access.renewed', refreshToken: 'refresh.current' });
+  }));
+
+  render(<StaffNewsComposer apiBaseUrl={newsBaseUrl} authBaseUrl={authBaseUrl} />);
+
+  await screen.findByRole('heading', { name: 'New News draft' });
+  expect(screen.getByRole('button', { name: 'Save draft' })).toBeTruthy();
+  expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+});
+
 function json(value) {
   return new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json' } });
 }

@@ -1,0 +1,26 @@
+.browser-auth-panel {
+	max-width: 38rem;
+	padding: 1.25rem;
+	border: 1px solid var(--theme-700);
+	border-radius: 0.5rem;
+}
+
+.browser-auth-panel form {
+	display: grid;
+	gap: 0.5rem;
+}
+
+.browser-auth-panel input,
+.browser-auth-panel button {
+	min-height: 2.5rem;
+	font: inherit;
+}
+
+.browser-auth-panel button {
+	width: fit-content;
+	margin-top: 0.75rem;
+}
+
+.browser-auth-status {
+	min-height: 1.7em;
+}

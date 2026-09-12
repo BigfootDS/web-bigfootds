@@ -1,0 +1,16 @@
+---
+import BaseHead from '../../../../components/BaseHead.astro';
+import StaffNewsComposer from '../../../../components/StaffNewsComposer.jsx';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title="News editor" description="Staff-only BigfootDS News editor." />
+	</head>
+	<body>
+		<main>
+			<StaffNewsComposer client:load apiBaseUrl={import.meta.env.PUBLIC_MS_NEWS_BASE_URL} authBaseUrl={import.meta.env.PUBLIC_MS_AUTH_BASE_URL} />
+		</main>
+	</body>
+</html>

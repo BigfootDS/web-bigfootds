@@ -138,6 +138,7 @@ export default function BrowserAuthSessionPanel({ apiBaseUrl, onSessionChange })
 
         <button type="submit">Sign in</button>
       </form>
+      <p><a href="/account/forgot-password/">Forgot your password?</a></p>
     </section>
   );
 }

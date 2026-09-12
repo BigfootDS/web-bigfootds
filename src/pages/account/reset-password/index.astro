@@ -1,0 +1,24 @@
+---
+import BaseHead from '../../../components/BaseHead.astro';
+import Footer from '../../../components/Footer.astro';
+import Header from '../../../components/Header.astro';
+import PasswordResetPanel from '../../../components/PasswordResetPanel.jsx';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title="Choose a new password" description="Set a new password for your BigfootDS account." />
+		<meta name="referrer" content="no-referrer" />
+	</head>
+	<body>
+		<Header />
+		<main>
+			<PasswordResetPanel client:only="react" apiBaseUrl={import.meta.env.PUBLIC_MS_AUTH_BASE_URL} />
+			<noscript>
+				<p>Password reset needs JavaScript to use the secure link. Please enable JavaScript and try again.</p>
+			</noscript>
+		</main>
+		<Footer />
+	</body>
+</html>

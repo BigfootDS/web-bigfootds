@@ -211,7 +211,14 @@ const serialisedProjects = serialiseJsonForScript(discoveryProjects);
 		list-style: none;
 	}
 
+	#project-results > li {
+		min-width: 0;
+	}
+
 	#project-results article {
+		box-sizing: border-box;
+		display: flex;
+		flex-direction: column;
 		height: 100%;
 		padding: 1rem;
 		border: 1px solid var(--theme-700);

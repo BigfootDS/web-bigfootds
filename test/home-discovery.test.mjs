@@ -9,15 +9,17 @@ test('keeps the latest News selection bounded and leaves an empty snapshot empty
   assert.throws(() => selectLatestNews(['one'], 0), /whole number/);
 });
 
-test('features only published project directory entries in newest-first order', () => {
+test('features only explicit editorial selections in their declared order', () => {
   const projects = [
-    { availability: 'coming-soon', id: 'bees', title: 'The Bestest Beehive' },
-    { availability: 'available', id: 'older', publishedAt: '2023-01-01T00:00:00.000Z', title: 'Older project' },
-    { availability: 'available', id: 'newer', publishedAt: '2024-01-01T00:00:00.000Z', title: 'Newer project' }
+    { featuredOrder: 2, id: 'godmaker', title: 'Godmaker' },
+    { id: 'unrelated', title: 'Unrelated project' },
+    { featuredOrder: 3, id: 'game-automated-semver', title: 'Game Automated Semver' },
+    { featuredOrder: 1, id: 'planet-protector-vr', title: 'Planet Protector VR' }
   ];
 
   assert.deepEqual(
     selectFeaturedProjects(projects).map((project) => project.id),
-    ['newer', 'older']
+    ['planet-protector-vr', 'godmaker', 'game-automated-semver']
   );
+  assert.deepEqual(selectFeaturedProjects(projects, 2).map((project) => project.id), ['planet-protector-vr', 'godmaker']);
 });

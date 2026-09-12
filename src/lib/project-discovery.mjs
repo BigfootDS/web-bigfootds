@@ -31,6 +31,7 @@ export function createProjectDiscoveryIndex(projects) {
     return {
       availability: publishedAt === undefined ? 'coming-soon' : 'available',
       description,
+      ...readFeaturedOrder(project.featuredOrder, index),
       href: `/projects/${id}/`,
       id,
       ...(publishedAt === undefined ? {} : { publishedAt }),
@@ -106,8 +107,8 @@ export function filterProjects(projects, filters) {
     .toSorted((left, right) => compareProjects(left, right, sort));
 }
 
-/** @typedef {{ description: string, id: string, publishedAt?: Date, title: string }} ProjectSource */
-/** @typedef {{ availability: 'available' | 'coming-soon', description: string, href: string, id: string, publishedAt?: string, title: string }} PublicProject */
+/** @typedef {{ description: string, featuredOrder?: number, id: string, publishedAt?: Date, title: string }} ProjectSource */
+/** @typedef {{ availability: 'available' | 'coming-soon', description: string, featuredOrder?: number, href: string, id: string, publishedAt?: string, title: string }} PublicProject */
 
 function compareProjects(left, right, sort) {
   if (sort === 'title') return compareText(left.title, right.title, left.id, right.id);
@@ -142,6 +143,14 @@ function readPublishedAt(value, index) {
   }
 
   return value.toISOString();
+}
+
+function readFeaturedOrder(value, index) {
+  if (value === undefined) return {};
+  if (!Number.isSafeInteger(value) || value < 1 || value > 12) {
+    throw new Error(`Project discovery item ${index + 1} has an invalid featuredOrder.`);
+  }
+  return { featuredOrder: value };
 }
 
 function normaliseAvailability(value) {

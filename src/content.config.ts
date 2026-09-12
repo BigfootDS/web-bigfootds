@@ -27,6 +27,7 @@ const projectPages = defineCollection({
 		pubDate: z.coerce.date().optional(),
 		updatedDate: z.coerce.date().optional(),
 		heroImage: z.string().optional(),
+		featuredOrder: z.number().int().min(1).max(12).optional(),
 	}),
 });
 

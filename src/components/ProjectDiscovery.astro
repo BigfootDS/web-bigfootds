@@ -6,6 +6,7 @@ import FormattedDate from './FormattedDate.astro';
 interface ProjectDiscoveryItem {
 	availability: 'available' | 'coming-soon';
 	description: string;
+	featuredOrder?: number;
 	href: string;
 	id: string;
 	publishedAt?: string;
@@ -83,6 +84,7 @@ const serialisedProjects = serialiseJsonForScript(discoveryProjects);
 	type PublicProject = {
 		availability: 'available' | 'coming-soon';
 		description: string;
+		featuredOrder?: number;
 		href: string;
 		id: string;
 		publishedAt?: string;

@@ -12,6 +12,7 @@ const projectEntries = await getCollection('projectPages');
 const projectImages = new Map(projectEntries.map((project) => [project.id, project.data.heroImage]));
 const projects = createProjectDiscoveryIndex(projectEntries.map((project) => ({
 	description: project.data.description,
+	featuredOrder: project.data.featuredOrder,
 	id: project.id,
 	publishedAt: project.data.pubDate,
 	title: project.data.title

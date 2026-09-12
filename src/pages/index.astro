@@ -16,6 +16,7 @@ const projectEntries = await getCollection('projectPages');
 const projectImages = new Map(projectEntries.map((project) => [project.id, project.data.heroImage]));
 const projectDirectory = createProjectDiscoveryIndex(projectEntries.map((project) => ({
 	description: project.data.description,
+	featuredOrder: project.data.featuredOrder,
 	id: project.id,
 	publishedAt: project.data.pubDate,
 	title: project.data.title
@@ -78,7 +79,7 @@ const featuredProjects = selectFeaturedProjects(projectDirectory).map((project) 
 								<li>
 									<article class="home-card">
 										{project.heroImage !== undefined && <img src={project.heroImage} alt="" loading="lazy" />}
-										<p class="home-card-meta">Available now</p>
+										<p class="home-card-meta">{project.availability === 'available' ? 'Available now' : 'In development'}</p>
 										<h3><a href={project.href}>{project.title}</a></h3>
 										<p>{project.description}</p>
 									</article>

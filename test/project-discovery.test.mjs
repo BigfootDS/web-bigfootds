@@ -11,6 +11,7 @@ import {
 const projects = createProjectDiscoveryIndex([
   {
     description: 'A published Unity package.',
+    featuredOrder: 2,
     id: 'unity-semver-updater',
     publishedAt: new Date('2024-07-10T00:00:00.000Z'),
     title: 'Unity Semver Updater'
@@ -32,6 +33,7 @@ test('creates an honest directory that derives availability only from publicatio
   assert.deepEqual(projects[0], {
     availability: 'available',
     description: 'A published Unity package.',
+    featuredOrder: 2,
     href: '/projects/unity-semver-updater/',
     id: 'unity-semver-updater',
     publishedAt: '2024-07-10T00:00:00.000Z',
@@ -39,6 +41,15 @@ test('creates an honest directory that derives availability only from publicatio
   });
   assert.equal(projects[1].availability, 'coming-soon');
   assert.equal('publishedAt' in projects[1], false);
+  assert.throws(
+    () => createProjectDiscoveryIndex([{
+      description: 'Invalid featured selection.',
+      featuredOrder: 0,
+      id: 'invalid-featured-selection',
+      title: 'Invalid featured selection'
+    }]),
+    /invalid featuredOrder/
+  );
 });
 
 test('reads bounded URL state and ignores unsupported lifecycle and sort values', () => {

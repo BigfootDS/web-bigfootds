@@ -1,5 +1,3 @@
-import { filterProjects } from './project-discovery.mjs';
-
 /**
  * Selects the most recent public News items for the static home page.
  *
@@ -17,19 +15,23 @@ export function selectLatestNews(posts, maximum = 3) {
 }
 
 /**
- * Selects published projects without assigning status data the content lacks.
+ * Selects editorially promoted projects for the static home page.
  *
- * The directory's existing `available` value is derived only from a project
- * publication date. This gives Home useful current work to feature while
- * leaving undated work discoverable through the full Projects page.
+ * An explicit content order deliberately avoids treating publication date or
+ * release status as a proxy for what BigfootDS wants to promote. This allows
+ * an in-development project to sit alongside released work without making a
+ * false availability claim in the full project directory.
  *
- * @template T extends {{ availability: string }}
+ * @template T extends {{ featuredOrder?: number }}
  * @param {readonly T[]} projects - Project directory metadata.
  * @param {number} [maximum=3] - Small visual-card limit for Home.
- * @returns {readonly T[]} Newest-first published project selection.
+ * @returns {readonly T[]} Explicitly ordered featured-project selection.
  */
 export function selectFeaturedProjects(projects, maximum = 3) {
-  return filterProjects(projects, { availability: 'available' }).slice(0, readMaximum(maximum));
+  return projects
+    .filter((project) => Number.isSafeInteger(project.featuredOrder))
+    .toSorted((left, right) => left.featuredOrder - right.featuredOrder)
+    .slice(0, readMaximum(maximum));
 }
 
 function readMaximum(value) {

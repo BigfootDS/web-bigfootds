@@ -1,0 +1,22 @@
+---
+import BaseHead from '../../components/BaseHead.astro';
+import BrowserAuthSessionPanel from '../../components/BrowserAuthSessionPanel.jsx';
+import Footer from '../../components/Footer.astro';
+import Header from '../../components/Header.astro';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title="Account" description="Sign in to BigfootDS account features." />
+	</head>
+	<body>
+		<Header />
+		<main>
+			<h1>Account</h1>
+			<p>Sign in when a BigfootDS feature asks you to connect your account.</p>
+			<BrowserAuthSessionPanel client:load apiBaseUrl={import.meta.env.PUBLIC_MS_AUTH_BASE_URL} />
+		</main>
+		<Footer />
+	</body>
+</html>

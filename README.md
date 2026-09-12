@@ -21,6 +21,32 @@ Building this as a classroom example / optional extra-curricular example project
 
 The repository of this front-end web-app is publicly visible since it holds no API keys or other sensitive data - the back-end servers / microservices will remain private though, as they do have keys and security logic that would become useless if it were public. White-label projects of the back-ends will be made during classes, it's really not special - but things like the JWT decryption keys cannot be shared.
 
+## Browser account sessions
+
+`/account/` is the small direct-client sign-in boundary for future account features. It uses MS-Auth's existing public login and protected verification endpoints. On a successful sign-in it retains only the returned access-token and refresh-token pair in the visitor's `localStorage`; the password, email, raw service errors, and tokens do not belong in the URL, static output, rendered HTML, analytics, or browser-visible error copy. Sign-out removes the local pair only. MS-Auth remains responsible for the persisted refresh-token state.
+
+This follows the selected BigfootDS client model, not a cookie or session-broker model. Browser storage is readable by same-origin JavaScript, so an XSS defect has a larger impact than with an HttpOnly cookie. Keep authenticated surfaces free of unreviewed third-party scripts, and follow the [OWASP HTML5 Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/HTML5_Security_Cheat_Sheet.html) when extending this boundary. The static GitHub Pages deployment cannot presently configure response security headers, so a reviewed edge or hosting-level Content Security Policy remains a required hardening follow-up. Do not add a permissive meta policy as a substitute.
+
+The account island does not attempt the current OAuth flow. Its existing redirect transport places an access token in an OAuth `state` query value, which conflicts with this website's no-token-in-URL rule. A separate reviewed OAuth redesign is required before an OAuth callback is added here.
+
+For local testing, set the non-secret public browser value to a bare HTTPS origin, or a loopback HTTP origin:
+
+```powershell
+$env:PUBLIC_MS_AUTH_BASE_URL = 'http://localhost:3000'
+npm run dev
+```
+
+The production value should derive from the existing canonical GitHub organisation variable `MS_AUTH_BASE_URL`; do not create a second unrelated base-URL variable. The deployed Pages workflow does not inject `PUBLIC_MS_AUTH_BASE_URL` yet, so the current production account page deliberately reports sign-in as unavailable instead of guessing an origin. Releasing it needs an explicitly approved workflow change that maps `PUBLIC_MS_AUTH_BASE_URL` from `vars.MS_AUTH_BASE_URL`, plus an MS-Auth deployment setting of `CORS_ALLOWED_ORIGINS=https://bigfootds.com`. Use the exact HTTPS origin, no wildcard, path, or trailing route. The browser requests omit cookies, disable caching, and use [a no-referrer policy](https://developer.mozilla.org/en-US/docs/Web/Security/Practical_implementation_guides/Referrer_policy).
+
+At this foundation stage, the browser sends a token pair only to MS-Auth:
+
+| Action | Request contract |
+| --- | --- |
+| Sign in | `POST /v1/users/public/login` with JSON email and password; MS-Auth returns the token pair. |
+| Verify or renew | `GET /v1/users/protected/verify` with `accessToken` and `refreshToken` headers. A renewed access token preserves the existing refresh token if MS-Auth omits one. |
+
+Do not reuse those header names blindly for another microservice. Each future authenticated browser feature must document and test that service's pair transport before it makes a request. Public news and Events remain anonymous and fully usable without a session.
+
 ## Build Your Own
 
 This project is based on the "Astro Starter Kit: Blog" project template. Make your own with this command in your NodeJS-ready terminal:

@@ -4,8 +4,11 @@ import test from 'node:test';
 import {
   ProfileSocialApiError,
   createMsAccountsRequest,
+  createMsUserRelationsRequest,
   createPublicProfileRequest,
   readEditableProfile,
+  readRelationshipPage,
+  readRelationshipSummary,
   readPublicProfile,
   readPublicProfileResponse,
   readPublicProfileServiceBaseUrl
@@ -82,6 +85,37 @@ test('selects only editable owner profile fields and preserves private link visi
     socialLinks: [{ sortOrder: 1, type: 'github', url: 'https://github.com/BigfootDS', visibility: 'private' }],
     tag: ''
   });
+});
+
+test('uses MS-UserRelations documented pair headers without a client bearer header', () => {
+  const request = createMsUserRelationsRequest({
+    apiBaseUrl: 'https://userrelations.bigfootds.dev/',
+    method: 'POST',
+    pathname: '/api/v1/relationships/friend-requests',
+    session,
+    body: { targetAuthUserId: 'opaque-account-id' }
+  });
+
+  assert.equal(request.init.headers.get('accessToken'), session.accessToken);
+  assert.equal(request.init.headers.get('refreshToken'), session.refreshToken);
+  assert.equal(request.init.headers.get('Authorization'), null);
+  assert.equal(request.init.credentials, 'omit');
+});
+
+test('accepts bounded opaque relationship data without profile fields', () => {
+  assert.deepEqual(readRelationshipSummary({
+    blocks: 1,
+    friends: 2,
+    incomingFriendRequests: 3,
+    outgoingFriendRequests: 4
+  }), {
+    blocks: 1,
+    friends: 2,
+    incomingFriendRequests: 3,
+    outgoingFriendRequests: 4
+  });
+  assert.deepEqual(readRelationshipPage({ hasMore: false, items: [{ friendAuthUserId: 'opaque-user' }], nextCursor: null }, 'friendAuthUserId'), [{ id: 'opaque-user' }]);
+  assert.throws(() => readRelationshipPage({ hasMore: false, items: [{ displayName: 'not allowed' }], nextCursor: null }, 'friendAuthUserId'), isInvalidResponseError);
 });
 
 function isConfigurationError(error) {

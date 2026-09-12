@@ -96,6 +96,63 @@ export function createMsAccountsRequest({ apiBaseUrl, body, method, pathname, se
   };
 }
 
+/**
+ * Creates an MS-UserRelations request with that service's documented token
+ * pair headers. It intentionally does not add a client Authorization header:
+ * MS-UserRelations derives the caller only from accessToken.
+ */
+export function createMsUserRelationsRequest({ apiBaseUrl, body, method, pathname, session }) {
+  if (!['GET', 'POST', 'DELETE'].includes(method) || !isRelationshipPath(pathname)) {
+    throw new ProfileSocialApiError('validation');
+  }
+
+  const safeSession = readSession(session);
+  const headers = new Headers({ accept: 'application/json' });
+  headers.set('accessToken', safeSession.accessToken);
+  headers.set('refreshToken', safeSession.refreshToken);
+  if (body !== undefined) headers.set('content-type', 'application/json');
+
+  return {
+    init: {
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      cache: 'no-store',
+      credentials: 'omit',
+      headers,
+      method,
+      referrerPolicy: 'no-referrer'
+    },
+    url: new URL(pathname, readPublicProfileServiceBaseUrl(apiBaseUrl))
+  };
+}
+
+/** Reads the bounded owner relationship page without accepting profile data. */
+export function readRelationshipPage(value, idField) {
+  if (!isRecord(value) || !Array.isArray(value.items) || typeof value.hasMore !== 'boolean' || (value.nextCursor !== null && typeof value.nextCursor !== 'string')) {
+    throw new ProfileSocialApiError('invalid-response');
+  }
+  if (value.items.length > 100) throw new ProfileSocialApiError('invalid-response');
+
+  return value.items.map((item) => {
+    if (!isRecord(item) || typeof item[idField] !== 'string' || item[idField].length === 0) {
+      throw new ProfileSocialApiError('invalid-response');
+    }
+    return { id: item[idField] };
+  });
+}
+
+/** Reads the relationship-summary count contract. */
+export function readRelationshipSummary(value) {
+  if (!isRecord(value)) throw new ProfileSocialApiError('invalid-response');
+  const counts = {};
+  for (const key of ['friends', 'incomingFriendRequests', 'outgoingFriendRequests', 'blocks']) {
+    if (typeof value[key] !== 'number' || !Number.isSafeInteger(value[key]) || value[key] < 0) {
+      throw new ProfileSocialApiError('invalid-response');
+    }
+    counts[key] = value[key];
+  }
+  return counts;
+}
+
 /** Validates the bounded public profile representation before rendering it. */
 export function readPublicProfile(value) {
   if (!isRecord(value) || Object.keys(value).some((key) => ![
@@ -294,6 +351,10 @@ function isTimestampOrNull(value) {
 
 function isLoopbackHost(hostname) {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+}
+
+function isRelationshipPath(pathname) {
+  return /^\/api\/v1\/relationships\/(?:summary|friends(?:\/[A-Za-z0-9._~-]+)?|blocks(?:\/[A-Za-z0-9._~-]+)?|friend-requests(?:\/(?:incoming|outgoing|[A-Za-z0-9._~-]+(?:\/respond)?))?)$/.test(pathname);
 }
 
 function isRecord(value) {

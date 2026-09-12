@@ -1,0 +1,41 @@
+.relationship-panel {
+	max-width: 52rem;
+	margin: 0 auto;
+}
+
+.relationship-panel form {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.5rem;
+	align-items: end;
+}
+
+.relationship-panel input,
+.relationship-panel select,
+.relationship-panel button {
+	min-height: 2.5rem;
+	font: inherit;
+}
+
+.relationship-summary {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+	gap: 0.75rem;
+}
+
+.relationship-summary div {
+	padding: 0.75rem;
+	border: 1px solid var(--theme-700);
+	border-radius: 0.5rem;
+}
+
+.relationship-summary dd {
+	margin: 0;
+	font-size: 1.5em;
+}
+
+@media (max-width: 720px) {
+	.relationship-panel form {
+		grid-template-columns: 1fr;
+	}
+}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { readStoredBrowserAuthSession } from '../lib/browser-auth-session.mjs';
+import { BrowserAuthSessionError, verifyStoredBrowserAuthSession } from '../lib/browser-auth-session.mjs';
 import {
   ProfileSocialApiError,
   createMsAccountsRequest,
@@ -12,34 +12,33 @@ import '../styles/account-profile.css';
  * Lets a signed-in visitor create or edit the profile fields owned by
  * MS-Accounts. The component never receives or renders an auth-user ID.
  *
- * @param {{ apiBaseUrl?: string }} props Public MS-Accounts origin.
+ * @param {{ apiBaseUrl?: string, authBaseUrl?: string }} props Public MS-Accounts and MS-Auth origins.
  * @returns {import('react').ReactNode} Profile creation or editing surface.
  */
-export default function AccountProfilePanel({ apiBaseUrl }) {
+export default function AccountProfilePanel({ apiBaseUrl, authBaseUrl }) {
   const [profile, setProfile] = useState(undefined);
   const [phase, setPhase] = useState('loading');
   const [status, setStatus] = useState('Loading your profile…');
 
   useEffect(() => {
     void loadProfile();
-  }, [apiBaseUrl]);
+  }, [apiBaseUrl, authBaseUrl]);
 
   async function loadProfile() {
-    if (!apiBaseUrl) {
+    if (!apiBaseUrl || !authBaseUrl) {
       setPhase('unavailable');
       setStatus('Profile editing is not available in this deployment yet.');
       return;
     }
 
     try {
-      const session = readStoredBrowserAuthSession(window.localStorage);
+      const session = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
       if (!session) {
         setPhase('signed-out');
         setStatus('Sign in to create or edit your profile.');
         return;
       }
-      const request = createMsAccountsRequest({ apiBaseUrl, method: 'GET', pathname: '/profiles/me', session });
-      const response = await fetch(request.url, request.init);
+      const response = await sendProfileRequest('GET', '/profiles/me', session);
       const nextProfile = await readEditableProfileResponse(response);
       setProfile(nextProfile);
       setPhase('ready');
@@ -50,7 +49,7 @@ export default function AccountProfilePanel({ apiBaseUrl }) {
         setStatus('Create your BigfootDS profile.');
         return;
       }
-      setPhase(error instanceof ProfileSocialApiError && error.kind === 'rejected' ? 'signed-out' : 'unavailable');
+      setPhase(isSignInRejection(error) ? 'signed-out' : 'unavailable');
       setStatus(statusForError(error));
     }
   }
@@ -71,23 +70,27 @@ export default function AccountProfilePanel({ apiBaseUrl }) {
     }
 
     try {
-      const session = readStoredBrowserAuthSession(window.localStorage);
+      const session = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
       if (!session) throw new ProfileSocialApiError('rejected');
-      const request = createMsAccountsRequest({
-        apiBaseUrl,
-        body,
-        method: profile ? 'PATCH' : 'POST',
-        pathname: profile ? '/profiles/me' : '/profiles',
-        session
-      });
-      const response = await fetch(request.url, request.init);
-      if (!response.ok) throw new ProfileSocialApiError(response.status >= 500 ? 'unavailable' : 'rejected');
+      const response = await sendProfileRequest(profile ? 'PATCH' : 'POST', profile ? '/profiles/me' : '/profiles', session, body);
+      if (!response.ok) throw new ProfileSocialApiError(response.status === 409 ? 'conflict' : response.status >= 500 ? 'unavailable' : 'rejected');
       setStatus(profile ? 'Your profile has been saved.' : 'Your profile has been created.');
       await loadProfile();
     } catch (error) {
       setStatus(statusForError(error));
-      if (error instanceof ProfileSocialApiError && error.kind === 'rejected') setPhase('signed-out');
+      if (isSignInRejection(error)) setPhase('signed-out');
     }
+  }
+
+  async function sendProfileRequest(method, pathname, session, body = undefined, allowRetry = true) {
+    const request = createMsAccountsRequest({ apiBaseUrl, body, method, pathname, session });
+    const response = await fetch(request.url, request.init);
+    if ((response.status === 401 || response.status === 403) && allowRetry) {
+      const renewedSession = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
+      if (!renewedSession) return response;
+      return sendProfileRequest(method, pathname, renewedSession, body, false);
+    }
+    return response;
   }
 
   if (phase === 'loading') return <p aria-live="polite">{status}</p>;
@@ -186,6 +189,12 @@ function readOptionalUrl(formData, key) {
 }
 
 function statusForError(error) {
-  if (error instanceof ProfileSocialApiError && error.kind === 'rejected') return 'Your sign-in has ended. Please sign in again.';
+  if (error instanceof ProfileSocialApiError && error.kind === 'conflict') return 'That display name or profile data is already in use. Change it and try again.';
+  if (isSignInRejection(error)) return 'Your sign-in has ended. Please sign in again.';
   return 'Profile changes are not available right now. Please try again later.';
+}
+
+function isSignInRejection(error) {
+  return (error instanceof BrowserAuthSessionError && error.kind === 'rejected')
+    || (error instanceof ProfileSocialApiError && error.kind === 'rejected');
 }

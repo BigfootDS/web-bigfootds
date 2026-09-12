@@ -7,6 +7,7 @@ import {
   createMsUserRelationsRequest,
   createPublicProfileRequest,
   readEditableProfile,
+  readEditableProfileResponse,
   readRelationshipPage,
   readRelationshipSummary,
   readPublicProfile,
@@ -85,6 +86,13 @@ test('selects only editable owner profile fields and preserves private link visi
     socialLinks: [{ sortOrder: 1, type: 'github', url: 'https://github.com/BigfootDS', visibility: 'private' }],
     tag: ''
   });
+});
+
+test('keeps an editable-profile conflict separate from a rejected session', async () => {
+  await assert.rejects(
+    readEditableProfileResponse(new Response(null, { status: 409 })),
+    (error) => error instanceof ProfileSocialApiError && error.kind === 'conflict'
+  );
 });
 
 test('uses MS-UserRelations documented pair headers without a client bearer header', () => {

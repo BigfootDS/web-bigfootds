@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { readStoredBrowserAuthSession } from '../lib/browser-auth-session.mjs';
+import { BrowserAuthSessionError, verifyStoredBrowserAuthSession } from '../lib/browser-auth-session.mjs';
 import {
   ProfileSocialApiError,
   createMsUserRelationsRequest,
@@ -14,25 +14,25 @@ import '../styles/relationship-panel.css';
  * MS-UserRelations. It shows opaque account IDs only because public profile
  * responses deliberately do not disclose an auth-user-ID mapping.
  *
- * @param {{ apiBaseUrl?: string }} props Public MS-UserRelations origin.
+ * @param {{ apiBaseUrl?: string, authBaseUrl?: string }} props Public MS-UserRelations and MS-Auth origins.
  * @returns {import('react').ReactNode} Relationship management controls.
  */
-export default function RelationshipPanel({ apiBaseUrl }) {
+export default function RelationshipPanel({ apiBaseUrl, authBaseUrl }) {
   const [data, setData] = useState(undefined);
   const [status, setStatus] = useState('Loading your connections…');
 
   useEffect(() => {
     void loadConnections();
-  }, [apiBaseUrl]);
+  }, [apiBaseUrl, authBaseUrl]);
 
   async function loadConnections() {
-    if (!apiBaseUrl) {
+    if (!apiBaseUrl || !authBaseUrl) {
       setStatus('Connections are not available in this deployment yet.');
       return;
     }
 
     try {
-      const session = readStoredBrowserAuthSession(window.localStorage);
+      const session = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
       if (!session) {
         setStatus('Sign in to manage your connections.');
         return;
@@ -59,8 +59,7 @@ export default function RelationshipPanel({ apiBaseUrl }) {
   }
 
   async function requestJson(pathname, session) {
-    const request = createMsUserRelationsRequest({ apiBaseUrl, method: 'GET', pathname, session });
-    const response = await fetch(request.url, request.init);
+    const response = await sendRelationshipRequest('GET', pathname, session);
     if (!response.ok) throw new ProfileSocialApiError(response.status >= 500 ? 'unavailable' : 'rejected');
     return response.json();
   }
@@ -68,16 +67,26 @@ export default function RelationshipPanel({ apiBaseUrl }) {
   async function runCommand(method, pathname, body = undefined) {
     if (!apiBaseUrl) return;
     try {
-      const session = readStoredBrowserAuthSession(window.localStorage);
+      const session = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
       if (!session) throw new ProfileSocialApiError('rejected');
-      const request = createMsUserRelationsRequest({ apiBaseUrl, body, method, pathname, session });
-      const response = await fetch(request.url, request.init);
+      const response = await sendRelationshipRequest(method, pathname, session, body);
       if (!response.ok) throw new ProfileSocialApiError(response.status >= 500 ? 'unavailable' : 'rejected');
       setStatus('Your connection change has been applied.');
       await loadConnections();
     } catch (error) {
       setStatus(statusForError(error));
     }
+  }
+
+  async function sendRelationshipRequest(method, pathname, session, body = undefined, allowRetry = true) {
+    const request = createMsUserRelationsRequest({ apiBaseUrl, body, method, pathname, session });
+    const response = await fetch(request.url, request.init);
+    if ((response.status === 401 || response.status === 403) && allowRetry) {
+      const renewedSession = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
+      if (!renewedSession) return response;
+      return sendRelationshipRequest(method, pathname, renewedSession, body, false);
+    }
+    return response;
   }
 
   function handleNewConnection(event) {
@@ -149,6 +158,8 @@ function RelationshipList({ title, entries, actionLabel, onAction }) {
 }
 
 function statusForError(error) {
-  if (error instanceof ProfileSocialApiError && error.kind === 'rejected') return 'Your sign-in has ended or this change is not available.';
+  if ((error instanceof BrowserAuthSessionError && error.kind === 'rejected') || (error instanceof ProfileSocialApiError && error.kind === 'rejected')) {
+    return 'Your sign-in has ended or this change is not available.';
+  }
   return 'Connections are not available right now. Please try again later.';
 }

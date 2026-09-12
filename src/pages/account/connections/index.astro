@@ -13,7 +13,7 @@ import RelationshipPanel from '../../../components/RelationshipPanel.jsx';
 	<body>
 		<Header />
 		<main>
-			<RelationshipPanel client:load apiBaseUrl={import.meta.env.PUBLIC_MS_USERRELATIONS_BASE_URL} />
+			<RelationshipPanel client:load apiBaseUrl={import.meta.env.PUBLIC_MS_USERRELATIONS_BASE_URL} authBaseUrl={import.meta.env.PUBLIC_MS_AUTH_BASE_URL} />
 		</main>
 		<Footer />
 	</body>

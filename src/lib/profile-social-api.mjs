@@ -6,7 +6,7 @@ const publicSocialLinkTypes = new Set([
 
 /** Safe error categories for profile and relationship browser presentation. */
 export class ProfileSocialApiError extends Error {
-  /** @param {'configuration' | 'invalid-response' | 'not-found' | 'rejected' | 'unavailable' | 'validation'} kind Safe UI category. */
+  /** @param {'configuration' | 'conflict' | 'invalid-response' | 'not-found' | 'rejected' | 'unavailable' | 'validation'} kind Safe UI category. */
   constructor(kind) {
     super('Profile service request could not be completed.');
     this.kind = kind;
@@ -228,6 +228,7 @@ export function readEditableProfile(value) {
 /** Maps an owner profile response to safe editor data and safe HTTP categories. */
 export async function readEditableProfileResponse(response) {
   if (response.status === 404) throw new ProfileSocialApiError('not-found');
+  if (response.status === 409) throw new ProfileSocialApiError('conflict');
   if (!response.ok) throw new ProfileSocialApiError(response.status >= 500 ? 'unavailable' : 'rejected');
 
   try {

@@ -18,10 +18,14 @@ const initialStatus = { message: 'Checking this browser session…', state: 'loa
  * Its API origin is deliberately public build configuration; credentials and
  * token material are never part of the page's static HTML.
  *
- * @param {{ apiBaseUrl?: string }} props Public MS-Auth origin supplied at build time.
+ * When the browser session becomes usable or is removed, `onSessionChange`
+ * lets an adjacent account feature re-read its own service data. The callback
+ * receives no token, user ID, password or server response.
+ *
+ * @param {{ apiBaseUrl?: string, onSessionChange?: (state: 'signed-in' | 'signed-out' | 'unavailable') => void }} props Public MS-Auth origin and safe state-change callback.
  * @returns {import('react').ReactNode} Account session controls.
  */
-export default function BrowserAuthSessionPanel({ apiBaseUrl }) {
+export default function BrowserAuthSessionPanel({ apiBaseUrl, onSessionChange }) {
   const [status, setStatus] = useState(initialStatus);
 
   useEffect(() => {
@@ -33,6 +37,7 @@ export default function BrowserAuthSessionPanel({ apiBaseUrl }) {
           message: 'Account sign-in is not available in this deployment yet.',
           state: 'unavailable'
         });
+        onSessionChange?.('unavailable');
         return;
       }
 
@@ -41,14 +46,18 @@ export default function BrowserAuthSessionPanel({ apiBaseUrl }) {
           apiBaseUrl,
           storage: window.localStorage
         });
-        setStatus(session === undefined
+        const nextStatus = session === undefined
           ? { message: 'Sign in to use account features as they become available.', state: 'signed-out' }
-          : { message: 'You are signed in on this browser.', state: 'signed-in' });
+          : { message: 'You are signed in on this browser.', state: 'signed-in' };
+        setStatus(nextStatus);
+        onSessionChange?.(nextStatus.state);
       } catch (error) {
-        setStatus(statusForError(error, 'verify'));
+        const nextStatus = statusForError(error, 'verify');
+        setStatus(nextStatus);
+        onSessionChange?.(nextStatus.state);
       }
     }
-  }, [apiBaseUrl]);
+  }, [apiBaseUrl, onSessionChange]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -67,6 +76,7 @@ export default function BrowserAuthSessionPanel({ apiBaseUrl }) {
       });
       form.reset();
       setStatus({ message: 'You are signed in on this browser.', state: 'signed-in' });
+      onSessionChange?.('signed-in');
     } catch (error) {
       setStatus(statusForError(error, 'sign-in'));
     }
@@ -76,6 +86,7 @@ export default function BrowserAuthSessionPanel({ apiBaseUrl }) {
     try {
       clearStoredBrowserAuthSession(window.localStorage);
       setStatus({ message: 'You have been signed out on this browser.', state: 'signed-out' });
+      onSessionChange?.('signed-out');
     } catch (error) {
       setStatus(statusForError(error, 'sign-out'));
     }

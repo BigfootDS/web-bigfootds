@@ -1,0 +1,17 @@
+.account-hub {
+  max-width: 70rem;
+  margin: 0 auto;
+}
+
+.account-hub-panels {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .account-hub-panels {
+    grid-template-columns: 1fr;
+  }
+}

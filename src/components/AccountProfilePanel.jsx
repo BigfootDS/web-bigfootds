@@ -12,47 +12,64 @@ import '../styles/account-profile.css';
  * Lets a signed-in visitor create or edit the profile fields owned by
  * MS-Accounts. The component never receives or renders an auth-user ID.
  *
- * @param {{ apiBaseUrl?: string, authBaseUrl?: string }} props Public MS-Accounts and MS-Auth origins.
+ * `sessionRevision` is a safe local counter from a companion sign-in control.
+ * It triggers a fresh read after login or logout without passing credentials
+ * between components. `headingLevel` keeps this reusable panel valid both as
+ * its own page and as one part of the account hub.
+ *
+ * @param {{ apiBaseUrl?: string, authBaseUrl?: string, headingLevel?: 1 | 2, sessionRevision?: number }} props Public origins and local presentation state.
  * @returns {import('react').ReactNode} Profile creation or editing surface.
  */
-export default function AccountProfilePanel({ apiBaseUrl, authBaseUrl }) {
+export default function AccountProfilePanel({ apiBaseUrl, authBaseUrl, headingLevel = 1, sessionRevision = 0 }) {
   const [profile, setProfile] = useState(undefined);
   const [phase, setPhase] = useState('loading');
+  const [profileRevision, setProfileRevision] = useState(0);
   const [status, setStatus] = useState('Loading your profile…');
 
   useEffect(() => {
+    let current = true;
+
+    setProfile(undefined);
+    setPhase('loading');
+    setStatus('Loading your profile…');
     void loadProfile();
-  }, [apiBaseUrl, authBaseUrl]);
 
-  async function loadProfile() {
-    if (!apiBaseUrl || !authBaseUrl) {
-      setPhase('unavailable');
-      setStatus('Profile editing is not available in this deployment yet.');
-      return;
-    }
+    return () => {
+      current = false;
+    };
 
-    try {
-      const session = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
-      if (!session) {
-        setPhase('signed-out');
-        setStatus('Sign in to create or edit your profile.');
+    async function loadProfile() {
+      if (!apiBaseUrl || !authBaseUrl) {
+        updateState('unavailable', 'Profile editing is not available in this deployment yet.');
         return;
       }
-      const response = await sendProfileRequest('GET', '/profiles/me', session);
-      const nextProfile = await readEditableProfileResponse(response);
-      setProfile(nextProfile);
-      setPhase('ready');
-      setStatus('Your profile is ready to edit.');
-    } catch (error) {
-      if (error instanceof ProfileSocialApiError && error.kind === 'not-found') {
-        setPhase('create');
-        setStatus('Create your BigfootDS profile.');
-        return;
+
+      try {
+        const session = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
+        if (!session) {
+          updateState('signed-out', 'Sign in to create or edit your profile.');
+          return;
+        }
+        const response = await sendProfileRequest('GET', '/profiles/me', session);
+        const nextProfile = await readEditableProfileResponse(response);
+        if (!current) return;
+        setProfile(nextProfile);
+        updateState('ready', 'Your profile is ready to edit.');
+      } catch (error) {
+        if (error instanceof ProfileSocialApiError && error.kind === 'not-found') {
+          updateState('create', 'Create your BigfootDS profile.');
+          return;
+        }
+        updateState(isSignInRejection(error) ? 'signed-out' : 'unavailable', statusForError(error));
       }
-      setPhase(isSignInRejection(error) ? 'signed-out' : 'unavailable');
-      setStatus(statusForError(error));
     }
-  }
+
+    function updateState(nextPhase, nextStatus) {
+      if (!current) return;
+      setPhase(nextPhase);
+      setStatus(nextStatus);
+    }
+  }, [apiBaseUrl, authBaseUrl, profileRevision, sessionRevision]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -75,7 +92,7 @@ export default function AccountProfilePanel({ apiBaseUrl, authBaseUrl }) {
       const response = await sendProfileRequest(profile ? 'PATCH' : 'POST', profile ? '/profiles/me' : '/profiles', session, body);
       if (!response.ok) throw new ProfileSocialApiError(response.status === 409 ? 'conflict' : response.status >= 500 ? 'unavailable' : 'rejected');
       setStatus(profile ? 'Your profile has been saved.' : 'Your profile has been created.');
-      await loadProfile();
+      setProfileRevision((revision) => revision + 1);
     } catch (error) {
       setStatus(statusForError(error));
       if (isSignInRejection(error)) setPhase('signed-out');
@@ -97,9 +114,10 @@ export default function AccountProfilePanel({ apiBaseUrl, authBaseUrl }) {
   if (phase === 'unavailable' || phase === 'signed-out') return <p aria-live="polite">{status}</p>;
 
   const editing = profile !== undefined;
+  const Heading = headingLevel === 2 ? 'h2' : 'h1';
   return (
     <section className="account-profile" aria-labelledby="account-profile-heading">
-      <h1 id="account-profile-heading">{editing ? 'Your profile' : 'Create your profile'}</h1>
+      <Heading id="account-profile-heading">{editing ? 'Your profile' : 'Create your profile'}</Heading>
       <p aria-live="polite">{status}</p>
       <form onSubmit={handleSubmit}>
         <label htmlFor="profile-editor-display-name">Display name</label>

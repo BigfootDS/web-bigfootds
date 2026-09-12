@@ -78,7 +78,8 @@ test('pages, validates, and sorts public locale-selected news deterministically'
   ]);
   assert.deepEqual(snapshot.posts.map((post) => post.id), [secondId, firstId]);
   assert.equal(snapshot.locale, DEFAULT_NEWS_LOCALE);
-  assert.equal(snapshot.version, 1);
+  assert.equal(snapshot.mediaDeliveryBaseUrl, 'https://news.example.test/api/v1/news/media/');
+  assert.equal(snapshot.version, 2);
 });
 
 test('fails rather than publishing malformed, duplicated, or looping public data', async () => {
@@ -106,10 +107,16 @@ test('replaces the snapshot so stale generated posts are not retained', async ()
   const outputPath = join(directory, 'public-news.json');
   const firstSnapshot = {
     locale: DEFAULT_NEWS_LOCALE,
+    mediaDeliveryBaseUrl: 'https://news.example.test/api/v1/news/media/',
     posts: [publicPost(firstId)],
-    version: 1
+    version: 2
   };
-  const emptySnapshot = { locale: DEFAULT_NEWS_LOCALE, posts: [], version: 1 };
+  const emptySnapshot = {
+    locale: DEFAULT_NEWS_LOCALE,
+    mediaDeliveryBaseUrl: 'https://news.example.test/api/v1/news/media/',
+    posts: [],
+    version: 2
+  };
 
   await writePublicNewsSnapshot(outputPath, firstSnapshot);
   await writePublicNewsSnapshot(outputPath, emptySnapshot);

@@ -12,6 +12,19 @@ const snapshotPath = resolve(process.cwd(), 'src/generated/public-news.json');
  * @returns {Promise<readonly import('../../scripts/news-publication.mjs').PublicNewsPost[]>} Public posts sorted by publication time.
  */
 export async function getGeneratedPublicNews() {
-  const snapshot = await readPublicNewsSnapshot(snapshotPath);
-  return snapshot.posts;
+  return (await getGeneratedPublicNewsSnapshot()).posts;
+}
+
+/**
+ * Loads the complete build-time MS-News snapshot for routes that need the
+ * verified public media-route prefix as well as article metadata.
+ *
+ * This still performs no browser request and never exposes editorial
+ * credentials: the route prefix is an ordinary public MS-News endpoint that
+ * authorises each media redirect at request time.
+ *
+ * @returns {ReturnType<typeof readPublicNewsSnapshot>} Validated static public News snapshot.
+ */
+export function getGeneratedPublicNewsSnapshot() {
+  return readPublicNewsSnapshot(snapshotPath);
 }

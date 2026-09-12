@@ -1,6 +1,11 @@
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
+import {
+  extractRichNewsDocumentText,
+  normaliseRichNewsDocument
+} from '../src/lib/news-rich-document.mjs';
+
 export const DEFAULT_NEWS_LOCALE = 'en-AU';
 export const NEWS_API_BASE_URL_ENVIRONMENT_VARIABLE = 'MS_NEWS_BASE_URL';
 const NEWS_LIST_PATH = '/api/v1/news';
@@ -51,14 +56,15 @@ export function readNewsApiBaseUrl(configuredValue) {
 
 /**
  * Downloads every public page for one locale and normalises the untrusted JSON
- * into the small, text-only shape the static site is allowed to publish.
+ * into the small, strictly validated shape the static site is allowed to
+ * publish.
  *
  * Pagination is sequential because MS-News cursors are opaque. Repeated
  * cursors, duplicate IDs, and malformed pages fail the build instead of
  * producing a partial or non-deterministic website snapshot.
  *
  * @param {{ apiBaseUrl: string, fetchImpl?: typeof fetch, locale?: string }} options - Public source settings.
- * @returns {Promise<{ locale: string, posts: readonly PublicNewsPost[], version: 1 }>} Deterministically sorted public data.
+ * @returns {Promise<{ locale: string, mediaDeliveryBaseUrl: string, posts: readonly PublicNewsPost[], version: 2 }>} Deterministically sorted public data.
  */
 export async function fetchPublicNews(options) {
   const apiBaseUrl = readNewsApiBaseUrl(options.apiBaseUrl);
@@ -98,8 +104,9 @@ export async function fetchPublicNews(options) {
     if (page.nextCursor === undefined) {
       return {
         locale,
+        mediaDeliveryBaseUrl: new URL('/api/v1/news/media/', apiBaseUrl).toString(),
         posts: posts.sort(comparePublicNewsPosts),
-        version: 1
+        version: 2
       };
     }
 
@@ -120,7 +127,7 @@ export async function fetchPublicNews(options) {
  * expired from the next static build.
  *
  * @param {string} outputPath - Ignored JSON file read by Astro during the build.
- * @param {{ locale: string, posts: readonly PublicNewsPost[], version: 1 }} snapshot - Validated public source data.
+ * @param {{ locale: string, mediaDeliveryBaseUrl: string, posts: readonly PublicNewsPost[], version: 2 }} snapshot - Validated public source data.
  * @returns {Promise<void>}
  */
 export async function writePublicNewsSnapshot(outputPath, snapshot) {
@@ -138,7 +145,7 @@ export async function writePublicNewsSnapshot(outputPath, snapshot) {
  * that could be mistaken for a successful publication run.
  *
  * @param {string} filePath - Ignored snapshot path.
- * @returns {Promise<{ locale: string, posts: readonly PublicNewsPost[], version: 1 }>}
+ * @returns {Promise<{ locale: string, mediaDeliveryBaseUrl: string, posts: readonly PublicNewsPost[], version: 2 }>}
  */
 export async function readPublicNewsSnapshot(filePath) {
   let content;
@@ -162,9 +169,15 @@ export async function readPublicNewsSnapshot(filePath) {
     throw new Error('Generated public news is not valid JSON. Run npm run news:sync again.');
   }
 
-  if (!isRecord(parsed) || parsed.version !== 1 || typeof parsed.locale !== 'string' || !Array.isArray(parsed.posts)) {
+  if (
+    !isRecord(parsed)
+    || parsed.version !== 2
+    || typeof parsed.locale !== 'string'
+    || !Array.isArray(parsed.posts)
+  ) {
     throw new Error('Generated public news has an unsupported shape. Run npm run news:sync again.');
   }
+  const mediaDeliveryBaseUrl = normaliseMediaDeliveryBaseUrl(parsed.mediaDeliveryBaseUrl);
 
   const posts = parsed.posts.map((post) => normalisePublicNewsPost(post, parsed.locale));
   const sortedPosts = [...posts].sort(comparePublicNewsPosts);
@@ -173,10 +186,10 @@ export async function readPublicNewsSnapshot(filePath) {
     throw new Error('Generated public news is not sorted deterministically. Run npm run news:sync again.');
   }
 
-  return { locale: parsed.locale, posts, version: 1 };
+  return { locale: parsed.locale, mediaDeliveryBaseUrl, posts, version: 2 };
 }
 
-/** @typedef {{ category: string, content: { body: string, locale: string, summary: string, title: string }, id: string, projectId: string, publishAt: string, tags: readonly string[] }} PublicNewsPost */
+/** @typedef {{ category: string, content: { body: string, document?: import('../src/lib/news-rich-document.mjs').RichNewsDocument, locale: string, summary: string, title: string }, id: string, projectId: string, publishAt: string, tags: readonly string[] }} PublicNewsPost */
 
 function normalisePublicNewsPage(value, locale) {
   if (!isRecord(value) || !Array.isArray(value.results) || !isRecord(value.pagination)) {
@@ -204,12 +217,7 @@ function normalisePublicNewsPost(value, requestedLocale) {
   const projectId = normaliseSlug(value.projectId, 'projectId');
   const category = normaliseSlug(value.category, 'category');
   const publishAt = normaliseIsoDate(value.publishAt, 'publishAt');
-  const content = {
-    body: normaliseText(value.content.body, 'content.body', 100_000),
-    locale: normaliseText(value.content.locale, 'content.locale', 35),
-    summary: normaliseText(value.content.summary, 'content.summary', 2_000),
-    title: normaliseText(value.content.title, 'content.title', 300)
-  };
+  const content = normalisePublicNewsContent(value.content);
 
   if (content.locale !== requestedLocale) {
     throw new Error(`MS-News returned ${content.locale} content while ${requestedLocale} was requested.`);
@@ -226,6 +234,54 @@ function normalisePublicNewsPost(value, requestedLocale) {
   }
 
   return { category, content, id, projectId, publishAt, tags };
+}
+
+function normalisePublicNewsContent(value) {
+  if (
+    !isRecord(value)
+    || Object.keys(value).some((key) => !['body', 'document', 'locale', 'summary', 'title'].includes(key))
+  ) {
+    throw new Error('MS-News returned malformed public news content.');
+  }
+
+  const body = normaliseText(value.body, 'content.body', 100_000);
+  const locale = normaliseText(value.locale, 'content.locale', 35);
+  const summary = normaliseText(value.summary, 'content.summary', 2_000);
+  const title = normaliseText(value.title, 'content.title', 300);
+  if (value.document === undefined) {
+    return { body, locale, summary, title };
+  }
+
+  const document = normaliseRichNewsDocument(value.document);
+  const derivedBody = extractRichNewsDocumentText(document);
+  if (derivedBody.length === 0 || derivedBody.length > 100_000) {
+    throw new Error('MS-News returned an invalid rich document body.');
+  }
+
+  return { body: derivedBody, document, locale, summary, title };
+}
+
+function normaliseMediaDeliveryBaseUrl(value) {
+  if (typeof value !== 'string') {
+    throw new Error('Generated public news is missing its media delivery base URL.');
+  }
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error('Generated public news has an invalid media delivery base URL.');
+  }
+  if (
+    (url.protocol !== 'http:' && url.protocol !== 'https:')
+    || url.username !== ''
+    || url.password !== ''
+    || url.search !== ''
+    || url.hash !== ''
+    || !url.pathname.endsWith('/api/v1/news/media/')
+  ) {
+    throw new Error('Generated public news has an unsafe media delivery base URL.');
+  }
+  return url.toString();
 }
 
 function normaliseText(value, field, maximumLength) {

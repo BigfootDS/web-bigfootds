@@ -224,12 +224,11 @@ function normalisePublicEvent(value, index) {
 }
 
 function normalisePublicEventIdentifier(value, index) {
-  const normalised = normaliseText(value, 'id', maximumIdentifierLength, index).toLowerCase();
-  if (!publicEventIdPattern.test(normalised)) {
+  if (typeof value !== 'string' || !publicEventIdPattern.test(value)) {
     throw new Error(`Public Event ${index + 1} has an invalid opaque id.`);
   }
 
-  return normalised;
+  return value;
 }
 
 function normaliseIdentifier(value, field, index) {

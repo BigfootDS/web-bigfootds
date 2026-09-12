@@ -78,6 +78,11 @@ test('fails rather than publishing private, duplicated, looping, or malformed Ev
 
   await assert.rejects(fetchPublicEvents({
     apiBaseUrl: 'https://liveops.example.test',
+    fetchImpl: async () => new Response(JSON.stringify(page([publicEvent(firstId.toUpperCase())])), { status: 200 })
+  }), /invalid opaque id/);
+
+  await assert.rejects(fetchPublicEvents({
+    apiBaseUrl: 'https://liveops.example.test',
     fetchImpl: async () => new Response(JSON.stringify({ ...page([]), privateField: true }), { status: 200 })
   }), /non-public Events page fields/);
 });

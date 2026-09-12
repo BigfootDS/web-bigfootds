@@ -75,16 +75,16 @@ The Pages workflow runs after a push to `main`, on a manual workflow dispatch, e
 
 Run the deterministic behaviour tests with `npm test`. `npm run astro -- check` runs Astro diagnostics, and `npm run build` performs the sync and static build.
 
-## Public Live Ops catalogue
+## Public events
 
-Live Ops configuration is not automatically public just because a game can read it. The `/live-ops/` page asks MS-LiveOpsConfig for an opt-in catalogue of currently active, visitor-facing summaries. It never receives a generic configuration payload, configuration key, revision ID, content hash, staff identity, or browser credential.
+LiveOps is an internal staff term, not player-facing website language. The `/events/` page asks MS-LiveOpsConfig for an opt-in list of currently active public events. It never receives generic configuration payloads, configuration keys, revision IDs, content hashes, staff identities, reward schedules, shop rotations, content sets, or browser credentials.
 
-Set the non-secret public deployment variable `PUBLIC_LIVEOPS_CONFIG_BASE_URL` to the bare public MS-LiveOpsConfig HTTP(S) origin. The page makes no request when that value is absent, then shows a simple unavailable state instead of guessing a service URL. For local work, a bare `http://localhost:<port>` or `http://127.0.0.1:<port>` origin is also allowed.
+Set the non-secret public deployment variable `PUBLIC_EVENTS_API_BASE_URL` to the bare public MS-LiveOpsConfig HTTP(S) origin. The page makes no request when that value is absent, then shows a simple unavailable state instead of guessing a service URL. For local work, a bare `http://localhost:<port>` or `http://127.0.0.1:<port>` origin is also allowed.
 
-The catalogue stays live in the browser because an active window can start or finish at any UTC instant. Visitors can share a literal title-and-summary search plus project, content-type, and tag filters in the page URL:
+The event list stays live in the browser because an active window can start or finish at any UTC instant. Visitors can share a literal title-and-summary search plus project and tag filters in the page URL:
 
 ```text
-/live-ops/?q=spring&project=thebestestbeehive&type=event_schedule&tag=event
+/events/?q=spring&project=thebestestbeehive&tag=event
 ```
 
-The page sends only anonymous, `no-store` requests with cookies omitted and no referrer. Add `https://bigfootds.com` to the deployed MS-LiveOpsConfig `CORS_ALLOWED_ORIGINS` value when releasing the matching catalogue endpoint. CORS is required for this browser feature, unlike the server-to-server news build. The service remains responsible for returning only bounded, explicitly approved public presentation metadata.
+The page sends only anonymous, `no-store` requests with cookies omitted and no referrer. Add `https://bigfootds.com` to the deployed MS-LiveOpsConfig `CORS_ALLOWED_ORIGINS` value when releasing the matching events endpoint. CORS is required for this browser feature, unlike the server-to-server news build. The service remains responsible for returning only bounded, explicitly approved event presentation metadata. Staff-only LiveOps editing belongs to a future authenticated administration surface, never this player route.

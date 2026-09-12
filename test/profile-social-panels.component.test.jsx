@@ -1,0 +1,99 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { expect, test, vi } from 'vitest';
+
+import AccountProfilePanel from '../src/components/AccountProfilePanel.jsx';
+import RelationshipPanel from '../src/components/RelationshipPanel.jsx';
+import { BROWSER_AUTH_SESSION_STORAGE_KEY } from '../src/lib/browser-auth-session.mjs';
+
+const authBaseUrl = 'https://auth.bigfootds.dev';
+const accountsBaseUrl = 'https://accounts.bigfootds.dev';
+const userRelationsBaseUrl = 'https://userrelations.bigfootds.dev';
+
+test('retries a rejected profile save once after renewal and keeps the editable conflict state', async () => {
+  writeSession({ accessToken: 'access.initial', refreshToken: 'refresh.current' });
+  const calls = [];
+  let verificationCount = 0;
+  let patchCount = 0;
+  vi.stubGlobal('fetch', vi.fn(async (input, init) => {
+    const url = new URL(input);
+    calls.push({ init, url });
+    if (url.origin === authBaseUrl) {
+      verificationCount += 1;
+      return json({ accessToken: `access.renewed-${verificationCount}` });
+    }
+    if (init.method === 'GET') return json(editableProfile);
+    patchCount += 1;
+    return new Response(null, { status: patchCount === 1 ? 401 : 409 });
+  }));
+
+  render(<AccountProfilePanel apiBaseUrl={accountsBaseUrl} authBaseUrl={authBaseUrl} />);
+  await screen.findByRole('heading', { name: 'Your profile' });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+
+  await screen.findByText('That display name or profile data is already in use. Change it and try again.');
+  expect(patchCount).toBe(2);
+  expect(verificationCount).toBe(3);
+  expect(screen.getByRole('heading', { name: 'Your profile' })).toBeTruthy();
+  expect(screen.getByDisplayValue('Alex')).toBeTruthy();
+
+  const patchCalls = calls.filter(({ init, url }) => url.origin === accountsBaseUrl && init.method === 'PATCH');
+  expect(patchCalls).toHaveLength(2);
+  expect(patchCalls[0].init.headers.get('accessToken')).toBe('access.renewed-2');
+  expect(patchCalls[1].init.headers.get('accessToken')).toBe('access.renewed-3');
+});
+
+test('renews and retries one rejected relationship read without forwarding a bearer credential', async () => {
+  writeSession({ accessToken: 'access.initial', refreshToken: 'refresh.current' });
+  const calls = [];
+  let verificationCount = 0;
+  let summaryCount = 0;
+  vi.stubGlobal('fetch', vi.fn(async (input, init) => {
+    const url = new URL(input);
+    calls.push({ init, url });
+    if (url.origin === authBaseUrl) {
+      verificationCount += 1;
+      return json({ accessToken: `access.renewed-${verificationCount}` });
+    }
+    if (url.pathname.endsWith('/summary')) {
+      summaryCount += 1;
+      return summaryCount === 1 ? new Response(null, { status: 401 }) : json(relationshipSummary);
+    }
+    return json({ hasMore: false, items: [], nextCursor: null });
+  }));
+
+  render(<RelationshipPanel apiBaseUrl={userRelationsBaseUrl} authBaseUrl={authBaseUrl} />);
+  await screen.findByText('Your connection lists are up to date.');
+
+  await waitFor(() => expect(summaryCount).toBe(2));
+  expect(verificationCount).toBe(2);
+  const relationshipCalls = calls.filter(({ url }) => url.origin === userRelationsBaseUrl);
+  expect(relationshipCalls).toHaveLength(6);
+  for (const { init } of relationshipCalls) {
+    expect(init.headers.get('Authorization')).toBeNull();
+    expect(init.headers.get('refreshToken')).toBe('refresh.current');
+  }
+});
+
+const editableProfile = {
+  biography: '',
+  displayName: 'Alex',
+  nameplate: '',
+  socialLinks: [],
+  tag: ''
+};
+
+const relationshipSummary = {
+  activeBlockCount: 0,
+  incomingPendingCount: 0,
+  outgoingPendingCount: 0,
+  visibleFriendCount: 0
+};
+
+function json(value) {
+  return new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json' } });
+}
+
+function writeSession(session) {
+  window.localStorage.setItem(BROWSER_AUTH_SESSION_STORAGE_KEY, JSON.stringify(session));
+}

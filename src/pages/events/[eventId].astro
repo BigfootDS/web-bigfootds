@@ -1,0 +1,98 @@
+---
+import BaseHead from '../../components/BaseHead.astro';
+import Footer from '../../components/Footer.astro';
+import Header from '../../components/Header.astro';
+import { getGeneratedPublicEvents } from '../../lib/public-events.mjs';
+
+export async function getStaticPaths() {
+	const events = await getGeneratedPublicEvents();
+	return events.map((event) => ({ params: { eventId: event.id }, props: { event } }));
+}
+
+const { event } = Astro.props;
+const formatDate = new Intl.DateTimeFormat('en-AU', {
+	dateStyle: 'long',
+	timeStyle: 'short',
+	timeZone: 'UTC'
+});
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={event.title} description={event.summary} />
+	</head>
+	<body>
+		<Header />
+		<main>
+			<a href="/events/">← All events</a>
+			<article id="event-detail" data-event-id={event.id}>
+				<h1>{event.title}</h1>
+				<p>{event.summary}</p>
+				<dl>
+					<div><dt>Project</dt><dd>{event.projectId}</dd></div>
+					<div><dt>Starts</dt><dd>{formatDate.format(new Date(event.startsAt))} UTC</dd></div>
+					{event.endsAt !== undefined && <div><dt>Ends</dt><dd>{formatDate.format(new Date(event.endsAt))} UTC</dd></div>}
+				</dl>
+				{event.tags.length > 0 && <p aria-label="Event tags">{event.tags.map((tag) => <span class="event-tag">#{tag}</span>)}</p>}
+			</article>
+			<p id="event-unavailable" hidden role="status">This event is not currently available.</p>
+			<noscript><p>This page was published from the latest Event snapshot. Turn on JavaScript to confirm it is still active.</p></noscript>
+		</main>
+		<Footer />
+	</body>
+</html>
+
+<script>
+	import {
+		createEventDetailUrl,
+		createPublicLiveOpsRequestInit,
+		readPublicLiveOpsEvent
+	} from '../../lib/liveops-discovery.mjs';
+
+	const detail = document.querySelector<HTMLElement>('#event-detail');
+	const unavailable = document.querySelector<HTMLElement>('#event-unavailable');
+	const eventId = detail?.dataset.eventId;
+	const apiBaseUrl = import.meta.env.PUBLIC_MS_LIVEOPSCONFIG_BASE_URL;
+
+	if (detail !== null && unavailable !== null && eventId !== undefined) {
+		const controller = new AbortController();
+		void fetch(createEventDetailUrl(apiBaseUrl, eventId), createPublicLiveOpsRequestInit(controller.signal))
+			.then(async (response) => {
+				if (response.status === 404) {
+					detail.hidden = true;
+					unavailable.hidden = false;
+					return;
+				}
+
+				if (!response.ok) throw new Error(`Events API returned ${response.status}.`);
+				const currentEvent = readPublicLiveOpsEvent(await response.json());
+				if (currentEvent.id !== eventId) throw new Error('Events API returned a mismatched Event.');
+			})
+			.catch(() => {
+				if (detail.hidden) return;
+				unavailable.textContent = 'This Event was published in the latest snapshot, but its current availability could not be confirmed.';
+				unavailable.hidden = false;
+			});
+	}
+</script>
+
+<style>
+	dl {
+		display: grid;
+		gap: 0.75rem;
+	}
+
+	dt {
+		font-weight: bold;
+	}
+
+	dd {
+		margin: 0;
+	}
+
+	.event-tag {
+		display: inline-block;
+		margin-right: 0.5rem;
+	}
+</style>

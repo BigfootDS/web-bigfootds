@@ -18,7 +18,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: public-news-pages-deploy
+  group: public-site-pages-deploy
   cancel-in-progress: true
 
 
@@ -47,6 +47,7 @@ jobs:
           CI: true
           NODE_ENV: production
           MS_NEWS_BASE_URL: ${{ vars.MS_NEWS_BASE_URL }}
+          MS_LIVEOPSCONFIG_BASE_URL: ${{ vars.MS_LIVEOPSCONFIG_BASE_URL }}
           PUBLIC_MS_LIVEOPSCONFIG_BASE_URL: ${{ vars.MS_LIVEOPSCONFIG_BASE_URL }}
       
       - name: Log build directory as a sanity check

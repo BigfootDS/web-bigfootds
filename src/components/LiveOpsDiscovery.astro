@@ -108,11 +108,14 @@
 			const listItem = document.createElement('li');
 			const article = document.createElement('article');
 			const title = document.createElement('h2');
+			const titleLink = document.createElement('a');
 			const summary = document.createElement('p');
 			const metadata = document.createElement('p');
 			const tags = document.createElement('p');
 
-			title.textContent = item.title;
+			titleLink.href = `/events/${encodeURIComponent(item.id)}/`;
+			titleLink.textContent = item.title;
+			title.append(titleLink);
 			summary.textContent = item.summary;
 			metadata.className = 'live-ops-meta';
 			metadata.textContent = `${item.projectId} · active from ${formatDate(item.startsAt)}${item.endsAt === undefined ? '' : ` to ${formatDate(item.endsAt)}`}`;

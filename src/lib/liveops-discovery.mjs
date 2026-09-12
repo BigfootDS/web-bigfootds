@@ -91,6 +91,23 @@ export function createLiveOpsCatalogueUrl(publicApiBaseUrl, filters, cursor = un
 }
 
 /**
+ * Builds an anonymous request that confirms whether a statically generated
+ * player Event page remains public and active. The event ID is already an
+ * opaque URL segment; callers may not pass a configuration key or arbitrary
+ * service path in its place.
+ *
+ * @param {string | undefined} publicApiBaseUrl - Derived browser-build API origin.
+ * @param {string} eventId - Opaque public Event identifier.
+ * @returns {URL} Service URL for one public Event detail projection.
+ * @throws {Error} When the origin or Event identifier is unsafe.
+ */
+export function createEventDetailUrl(publicApiBaseUrl, eventId) {
+  const origin = readPublicApiOrigin(publicApiBaseUrl);
+  const identifier = readEventIdentifier(eventId);
+  return new URL(`/api/v1/events/${encodeURIComponent(identifier)}`, origin);
+}
+
+/**
  * Provides the privacy-preserving request options shared by every public
  * events read. The player-facing browser page is anonymous, so it must not send
  * website cookies or a referrer that could include a visitor's filter query.
@@ -150,6 +167,23 @@ export function readPublicLiveOpsCatalogue(value) {
   };
 }
 
+/**
+ * Validates the exact anonymous Event detail envelope. Keeping this distinct
+ * from the list parser prevents a newly added service field from becoming
+ * browser-visible before the player-facing contract is reviewed.
+ *
+ * @param {unknown} value - Parsed JSON response from the public Event route.
+ * @returns {PublicLiveOpsItem} Validated public Event detail.
+ * @throws {Error} When the response is not the documented public DTO.
+ */
+export function readPublicLiveOpsEvent(value) {
+  if (!isRecord(value) || !isRecord(value.event) || Object.keys(value).length !== 1) {
+    throw new Error('The Events API returned an invalid public event response.');
+  }
+
+  return readPublicLiveOpsItem(value.event, 0);
+}
+
 /** @typedef {{ endsAt?: string, id: string, projectId: string, startsAt: string, summary: string, tags: readonly string[], title: string }} PublicLiveOpsItem */
 
 function readPublicApiOrigin(value) {
@@ -205,6 +239,14 @@ function readPublicLiveOpsItem(value, index) {
 function readStableIdentifier(value, field, index) {
   if (typeof value !== 'string' || !stableIdentifierPattern.test(value) || value.length > maximumIdentifierLength) {
     throw new Error(`Event item ${index + 1} has an invalid ${field}.`);
+  }
+
+  return value;
+}
+
+function readEventIdentifier(value) {
+  if (typeof value !== 'string' || !stableIdentifierPattern.test(value) || value.length > maximumIdentifierLength) {
+    throw new Error('Event ID must be a lowercase stable identifier.');
   }
 
   return value;

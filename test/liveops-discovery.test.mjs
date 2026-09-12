@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   LIVE_OPS_PAGE_SIZE,
+  createEventDetailUrl,
   MAXIMUM_LIVE_OPS_QUERY_LENGTH,
   createLiveOpsCatalogueUrl,
   createLatestLiveOpsRequestCoordinator,
@@ -10,6 +11,7 @@ import {
   readLiveOpsCursor,
   readLiveOpsFilters,
   readPublicLiveOpsCatalogue,
+  readPublicLiveOpsEvent,
   serialiseLiveOpsFilters
 } from '../src/lib/liveops-discovery.mjs';
 
@@ -59,6 +61,11 @@ test('builds an anonymous public catalogue request from a bare public origin', (
   assert.throws(() => createLiveOpsCatalogueUrl('https://user:pass@liveops.bigfootds.dev', {}), /bare HTTPS origin/);
   assert.throws(() => createLiveOpsCatalogueUrl('https://liveops.bigfootds.dev/api', {}), /bare HTTPS origin/);
   assert.equal(createLiveOpsCatalogueUrl('http://127.0.0.1:8080', {}).origin, 'http://127.0.0.1:8080');
+  assert.equal(
+    createEventDetailUrl('https://liveops.bigfootds.dev', 'evt_0123456789abcdef0123456789abcdef').toString(),
+    'https://liveops.bigfootds.dev/api/v1/events/evt_0123456789abcdef0123456789abcdef'
+  );
+  assert.throws(() => createEventDetailUrl('https://liveops.bigfootds.dev', '../private-key'), /Event ID must be a lowercase stable identifier/);
 });
 
 test('accepts only the small documented public catalogue DTO', () => {
@@ -94,6 +101,15 @@ test('accepts only the small documented public catalogue DTO', () => {
   assert.throws(
     () => readPublicLiveOpsCatalogue({ items: Array.from({ length: 101 }, () => publicCatalogue.items[0]) }),
     /invalid public response/
+  );
+  assert.deepEqual(readPublicLiveOpsEvent({ event: publicCatalogue.items[0] }), publicCatalogue.items[0]);
+  assert.throws(
+    () => readPublicLiveOpsEvent({ event: { ...publicCatalogue.items[0], payload: { secret: true } } }),
+    /non-public fields/
+  );
+  assert.throws(
+    () => readPublicLiveOpsEvent({ event: publicCatalogue.items[0], nextCursor: 'not-allowed' }),
+    /invalid public event response/
   );
 });
 

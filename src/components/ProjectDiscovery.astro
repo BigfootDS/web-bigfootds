@@ -1,0 +1,225 @@
+---
+import { filterProjects } from '../lib/project-discovery.mjs';
+import { serialiseJsonForScript } from '../lib/json-for-script.mjs';
+import FormattedDate from './FormattedDate.astro';
+
+interface ProjectDiscoveryItem {
+	availability: 'available' | 'coming-soon';
+	description: string;
+	href: string;
+	id: string;
+	publishedAt?: string;
+	title: string;
+}
+
+const { projects } = Astro.props as { projects: readonly ProjectDiscoveryItem[] };
+const displayedProjects = filterProjects(projects, {});
+const serialisedProjects = serialiseJsonForScript(projects);
+---
+
+<section class="project-discovery" aria-labelledby="project-discovery-heading">
+	<h1 id="project-discovery-heading">Projects</h1>
+	<p>Explore BigfootDS games, tools and experiments. Search the existing project descriptions, then narrow the current catalogue by availability.</p>
+
+	<form id="project-filters" action="/projects/" method="get">
+		<div class="filter-field filter-field-wide">
+			<label for="project-query">Search projects</label>
+			<input id="project-query" name="q" type="search" maxlength="120" autocomplete="off" />
+		</div>
+		<div class="filter-field">
+			<label for="project-availability">Availability</label>
+			<select id="project-availability" name="availability">
+				<option value="">All projects</option>
+				<option value="available">Available now</option>
+				<option value="coming-soon">Coming soon</option>
+			</select>
+		</div>
+		<div class="filter-field">
+			<label for="project-sort">Sort</label>
+			<select id="project-sort" name="sort">
+				<option value="newest">Newest first</option>
+				<option value="oldest">Oldest first</option>
+				<option value="title">Title A–Z</option>
+			</select>
+		</div>
+		<div class="filter-actions">
+			<button type="submit">Apply</button>
+			<a href="/projects/" id="project-clear-filters">Clear</a>
+		</div>
+	</form>
+
+	<p id="project-result-count" aria-live="polite"></p>
+	<p id="project-empty-state" hidden>No projects match those controls. Try clearing a filter or searching for something else.</p>
+	<noscript><p>Project search, availability and sorting need JavaScript because this is a static site. Every project is still listed below.</p></noscript>
+
+	<ul id="project-results">
+		{
+			displayedProjects.map((project) => (
+				<li data-project-id={project.id}>
+					<article>
+						<p class="project-meta">{project.availability === 'available' ? 'Available now' : 'Coming soon'}</p>
+						<h2><a href={project.href}>{project.title}</a></h2>
+						<p>{project.description}</p>
+						{project.publishedAt !== undefined && <p class="project-date"><FormattedDate date={new Date(project.publishedAt)} /></p>}
+					</article>
+				</li>
+			))
+		}
+	</ul>
+</section>
+
+<script id="project-directory-data" type="application/json" is:inline set:html={serialisedProjects}></script>
+<script>
+	import { filterProjects, readProjectFilters, serialiseProjectFilters } from '../lib/project-discovery.mjs';
+
+	type ProjectFilters = { availability?: string; q?: string; sort?: string };
+	type PublicProject = {
+		availability: 'available' | 'coming-soon';
+		description: string;
+		href: string;
+		id: string;
+		publishedAt?: string;
+		title: string;
+	};
+
+	function requireElement<T extends Element>(selector: string): T {
+		const element = document.querySelector<T>(selector);
+		if (element === null) throw new Error(`The project discovery control ${selector} could not be initialised.`);
+		return element;
+	}
+
+	const form = requireElement<HTMLFormElement>('#project-filters');
+	const query = requireElement<HTMLInputElement>('#project-query');
+	const availability = requireElement<HTMLSelectElement>('#project-availability');
+	const sort = requireElement<HTMLSelectElement>('#project-sort');
+	const clear = requireElement<HTMLAnchorElement>('#project-clear-filters');
+	const results = requireElement<HTMLUListElement>('#project-results');
+	const resultCount = requireElement<HTMLElement>('#project-result-count');
+	const emptyState = requireElement<HTMLElement>('#project-empty-state');
+	const data = requireElement<HTMLScriptElement>('#project-directory-data');
+	const cards = new Map(
+		[...document.querySelectorAll<HTMLLIElement>('[data-project-id]')]
+			.map((card) => [card.dataset.projectId ?? '', card])
+	);
+	const projects = JSON.parse(data.textContent ?? '[]') as readonly PublicProject[];
+
+	function render(filters: ProjectFilters) {
+		query.value = filters.q ?? '';
+		availability.value = filters.availability ?? '';
+		sort.value = filters.sort ?? 'newest';
+
+		const matchingProjects = filterProjects(projects, filters);
+		const matchingIds = new Set(matchingProjects.map((project) => project.id));
+
+		for (const [id, card] of cards) {
+			card.hidden = !matchingIds.has(id);
+		}
+		for (const project of matchingProjects) {
+			const card = cards.get(project.id);
+			if (card !== undefined) results.append(card);
+		}
+
+		resultCount.textContent = `${matchingProjects.length} ${matchingProjects.length === 1 ? 'project' : 'projects'} found.`;
+		emptyState.hidden = matchingProjects.length !== 0;
+		clear.hidden = serialiseProjectFilters(filters).size === 0;
+	}
+
+	function updateUrl(filters: ProjectFilters) {
+		const parameters = serialiseProjectFilters(filters);
+		const queryString = parameters.toString();
+		history.pushState({}, '', queryString === '' ? '/projects/' : `/projects/?${queryString}`);
+	}
+
+	function filtersFromLocation() {
+		return readProjectFilters(new URLSearchParams(window.location.search));
+	}
+
+	form.addEventListener('submit', (event) => {
+		event.preventDefault();
+		const filters = readProjectFilters(new URLSearchParams({
+			availability: availability.value,
+			q: query.value,
+			sort: sort.value
+		}));
+		updateUrl(filters);
+		render(filters);
+	});
+
+	clear.addEventListener('click', (event) => {
+		event.preventDefault();
+		form.reset();
+		updateUrl({});
+		render({});
+	});
+
+	window.addEventListener('popstate', () => render(filtersFromLocation()));
+	render(filtersFromLocation());
+</script>
+
+<style>
+	.project-discovery {
+		max-width: 960px;
+		margin: 0 auto;
+	}
+
+	form {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 1rem;
+		padding: 1rem;
+		border: 1px solid var(--theme-700);
+		border-radius: 0.5rem;
+	}
+
+	.filter-field {
+		display: grid;
+		gap: 0.25rem;
+	}
+
+	.filter-field-wide {
+		grid-column: span 2;
+	}
+
+	input,
+	select,
+	button {
+		min-height: 2.5rem;
+		font: inherit;
+	}
+
+	.filter-actions {
+		display: flex;
+		align-items: end;
+		gap: 1rem;
+		grid-column: span 2;
+	}
+
+	#project-results {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+		gap: 1rem;
+		padding: 0;
+		list-style: none;
+	}
+
+	#project-results article {
+		height: 100%;
+		padding: 1rem;
+		border: 1px solid var(--theme-700);
+		border-radius: 0.5rem;
+	}
+
+	.project-meta,
+	.project-date {
+		font-size: 0.85em;
+	}
+
+	@media (max-width: 720px) {
+		form,
+		.filter-field-wide,
+		.filter-actions {
+			grid-column: auto;
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

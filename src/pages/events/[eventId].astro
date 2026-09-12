@@ -55,26 +55,30 @@ const formatDate = new Intl.DateTimeFormat('en-AU', {
 	const eventId = detail?.dataset.eventId;
 	const apiBaseUrl = import.meta.env.PUBLIC_MS_LIVEOPSCONFIG_BASE_URL;
 
-	if (detail !== null && unavailable !== null && eventId !== undefined) {
-		const controller = new AbortController();
-		void fetch(createEventDetailUrl(apiBaseUrl, eventId), createPublicLiveOpsRequestInit(controller.signal))
-			.then(async (response) => {
-				if (response.status === 404) {
-					detail.hidden = true;
-					unavailable.hidden = false;
-					return;
-				}
-
-				if (!response.ok) throw new Error(`Events API returned ${response.status}.`);
-				const currentEvent = readPublicLiveOpsEvent(await response.json());
-				if (currentEvent.id !== eventId) throw new Error('Events API returned a mismatched Event.');
-			})
-			.catch(() => {
-				if (detail.hidden) return;
-				unavailable.textContent = 'This Event was published in the latest snapshot, but its current availability could not be confirmed.';
+if (detail !== null && unavailable !== null && eventId !== undefined) {
+	const controller = new AbortController();
+	void (async () => {
+		try {
+			const response = await fetch(
+				createEventDetailUrl(apiBaseUrl, eventId),
+				createPublicLiveOpsRequestInit(controller.signal)
+			);
+			if (response.status === 404) {
+				detail.hidden = true;
 				unavailable.hidden = false;
-			});
-	}
+				return;
+			}
+
+			if (!response.ok) throw new Error(`Events API returned ${response.status}.`);
+			const currentEvent = readPublicLiveOpsEvent(await response.json());
+			if (currentEvent.id !== eventId) throw new Error('Events API returned a mismatched Event.');
+		} catch {
+			if (detail.hidden) return;
+			unavailable.textContent = 'This Event was published in the latest snapshot, but its current availability could not be confirmed.';
+			unavailable.hidden = false;
+		}
+	})();
+}
 </script>
 
 <style>

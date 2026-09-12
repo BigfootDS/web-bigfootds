@@ -7,6 +7,7 @@ const maximumSummaryLength = 600;
 const maximumTagCount = 12;
 const maximumTitleLength = 160;
 const cursorPattern = /^[A-Za-z0-9_-]+$/;
+const publicEventIdPattern = /^evt_[a-f0-9]{32}$/;
 const stableIdentifierPattern = /^[a-z][a-z0-9._-]{0,79}$/;
 
 /**
@@ -226,7 +227,7 @@ function readPublicLiveOpsItem(value, index) {
   }
 
   return {
-    id: readStableIdentifier(value.id, 'id', index),
+    id: readEventIdentifier(value.id),
     projectId: readStableIdentifier(value.projectId, 'projectId', index),
     title: readBoundedText(value.title, 'title', maximumTitleLength, index),
     summary: readBoundedText(value.summary, 'summary', maximumSummaryLength, index),
@@ -245,8 +246,8 @@ function readStableIdentifier(value, field, index) {
 }
 
 function readEventIdentifier(value) {
-  if (typeof value !== 'string' || !stableIdentifierPattern.test(value) || value.length > maximumIdentifierLength) {
-    throw new Error('Event ID must be a lowercase stable identifier.');
+  if (typeof value !== 'string' || !publicEventIdPattern.test(value)) {
+    throw new Error('Event ID must be an opaque evt_ identifier.');
   }
 
   return value;

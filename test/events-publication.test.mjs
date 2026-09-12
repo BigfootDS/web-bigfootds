@@ -70,6 +70,16 @@ test('fails rather than publishing private, duplicated, looping, or malformed Ev
     apiBaseUrl: 'https://liveops.example.test',
     fetchImpl: async () => new Response(JSON.stringify(page([], 'same-cursor')), { status: 200 })
   }), /repeated public Events cursor/);
+
+  await assert.rejects(fetchPublicEvents({
+    apiBaseUrl: 'https://liveops.example.test',
+    fetchImpl: async () => new Response(JSON.stringify(page([publicEvent('spring-festival')])), { status: 200 })
+  }), /invalid opaque id/);
+
+  await assert.rejects(fetchPublicEvents({
+    apiBaseUrl: 'https://liveops.example.test',
+    fetchImpl: async () => new Response(JSON.stringify({ ...page([]), privateField: true }), { status: 200 })
+  }), /non-public Events page fields/);
 });
 
 test('replaces and revalidates the generated snapshot', async () => {
@@ -80,4 +90,7 @@ test('replaces and revalidates the generated snapshot', async () => {
 
   assert.deepEqual(JSON.parse(await readFile(outputPath, 'utf8')), { events: [], version: 1 });
   assert.deepEqual(await readPublicEventsSnapshot(outputPath), { events: [], version: 1 });
+
+  await writePublicEventsSnapshot(outputPath, { events: [publicEvent(firstId), publicEvent(firstId)], version: 1 });
+  await assert.rejects(readPublicEventsSnapshot(outputPath), /duplicate identifiers/);
 });

@@ -10,6 +10,7 @@ const maximumIdentifierLength = 80;
 const maximumSummaryLength = 600;
 const maximumTagCount = 12;
 const maximumTitleLength = 160;
+const publicEventIdPattern = /^evt_[a-f0-9]{32}$/;
 const stableIdentifierPattern = /^[a-z][a-z0-9._-]{0,79}$/;
 
 /**
@@ -159,6 +160,9 @@ export async function readPublicEventsSnapshot(filePath) {
   }
 
   const events = parsed.events.map((event, index) => normalisePublicEvent(event, index));
+  if (new Set(events.map((event) => event.id)).size !== events.length) {
+    throw new Error('Generated public Events contain duplicate identifiers. Run npm run events:sync again.');
+  }
   const sortedEvents = [...events].sort(comparePublicEvents);
   if (events.some((event, index) => event !== sortedEvents[index])) {
     throw new Error('Generated public Events are not sorted deterministically. Run npm run events:sync again.');
@@ -172,6 +176,10 @@ export async function readPublicEventsSnapshot(filePath) {
 function normalisePublicEventsPage(value) {
   if (!isRecord(value) || !Array.isArray(value.items)) {
     throw new Error('MS-LiveOpsConfig returned a malformed public Events page.');
+  }
+
+  if (Object.keys(value).some((key) => key !== 'items' && key !== 'nextCursor')) {
+    throw new Error('MS-LiveOpsConfig returned non-public Events page fields.');
   }
 
   if (value.items.length > MAXIMUM_PAGE_SIZE) {
@@ -205,7 +213,7 @@ function normalisePublicEvent(value, index) {
   }
 
   return {
-    id: normaliseIdentifier(value.id, 'id', index),
+    id: normalisePublicEventIdentifier(value.id, index),
     projectId: normaliseIdentifier(value.projectId, 'projectId', index),
     title: normaliseText(value.title, 'title', maximumTitleLength, index),
     summary: normaliseText(value.summary, 'summary', maximumSummaryLength, index),
@@ -213,6 +221,15 @@ function normalisePublicEvent(value, index) {
     startsAt,
     ...(endsAt === undefined ? {} : { endsAt })
   };
+}
+
+function normalisePublicEventIdentifier(value, index) {
+  const normalised = normaliseText(value, 'id', maximumIdentifierLength, index).toLowerCase();
+  if (!publicEventIdPattern.test(normalised)) {
+    throw new Error(`Public Event ${index + 1} has an invalid opaque id.`);
+  }
+
+  return normalised;
 }
 
 function normaliseIdentifier(value, field, index) {

@@ -18,7 +18,7 @@ import {
 const publicCatalogue = {
   items: [{
     endsAt: '2026-09-13T00:00:00.000Z',
-    id: 'spring-event',
+    id: 'evt_0123456789abcdef0123456789abcdef',
     projectId: 'thebestestbeehive',
     startsAt: '2026-09-12T00:00:00.000Z',
     summary: 'A short public event summary.',
@@ -65,7 +65,7 @@ test('builds an anonymous public catalogue request from a bare public origin', (
     createEventDetailUrl('https://liveops.bigfootds.dev', 'evt_0123456789abcdef0123456789abcdef').toString(),
     'https://liveops.bigfootds.dev/api/v1/events/evt_0123456789abcdef0123456789abcdef'
   );
-  assert.throws(() => createEventDetailUrl('https://liveops.bigfootds.dev', '../private-key'), /Event ID must be a lowercase stable identifier/);
+  assert.throws(() => createEventDetailUrl('https://liveops.bigfootds.dev', '../private-key'), /Event ID must be an opaque evt_ identifier/);
 });
 
 test('accepts only the small documented public catalogue DTO', () => {
@@ -110,6 +110,10 @@ test('accepts only the small documented public catalogue DTO', () => {
   assert.throws(
     () => readPublicLiveOpsEvent({ event: publicCatalogue.items[0], nextCursor: 'not-allowed' }),
     /invalid public event response/
+  );
+  assert.throws(
+    () => readPublicLiveOpsCatalogue({ items: [{ ...publicCatalogue.items[0], id: 'config-key-shaped-event' }] }),
+    /opaque evt_ identifier/
   );
 });
 

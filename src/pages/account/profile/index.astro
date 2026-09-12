@@ -1,5 +1,4 @@
 ---
-import AccountProfilePanel from '../../../components/AccountProfilePanel.jsx';
 import BaseHead from '../../../components/BaseHead.astro';
 import Footer from '../../../components/Footer.astro';
 import Header from '../../../components/Header.astro';
@@ -8,12 +7,15 @@ import Header from '../../../components/Header.astro';
 <!doctype html>
 <html lang="en">
 	<head>
-		<BaseHead title="Your profile" description="Create or edit your BigfootDS profile." />
+		<BaseHead title="Your account" description="Manage your BigfootDS sign-in and profile." />
+		<meta http-equiv="refresh" content="0; url=/account/" />
+		<link rel="canonical" href="https://bigfootds.com/account/" />
 	</head>
 	<body>
 		<Header />
 		<main>
-			<AccountProfilePanel client:load apiBaseUrl={import.meta.env.PUBLIC_MS_ACCOUNTS_BASE_URL} authBaseUrl={import.meta.env.PUBLIC_MS_AUTH_BASE_URL} />
+			<h1>Profile settings moved</h1>
+			<p>Your profile is now part of <a href="/account/">Your account</a>.</p>
 		</main>
 		<Footer />
 	</body>

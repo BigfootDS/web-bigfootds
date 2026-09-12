@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
+import AccountHub from '../src/components/AccountHub.jsx';
 import AccountProfilePanel from '../src/components/AccountProfilePanel.jsx';
 import RelationshipPanel from '../src/components/RelationshipPanel.jsx';
 import { BROWSER_AUTH_SESSION_STORAGE_KEY } from '../src/lib/browser-auth-session.mjs';
@@ -73,6 +74,30 @@ test('renews and retries one rejected relationship read without forwarding a bea
     expect(init.headers.get('Authorization')).toBeNull();
     expect(init.headers.get('refreshToken')).toBe('refresh.current');
   }
+});
+
+test('refreshes profile controls after sign-in on the combined account screen', async () => {
+  window.localStorage.clear();
+  vi.stubGlobal('fetch', vi.fn(async (input, init) => {
+    const url = new URL(input);
+    if (url.origin === authBaseUrl && url.pathname.endsWith('/login')) {
+      return json({ accessToken: 'access.fresh', refreshToken: 'refresh.fresh' });
+    }
+    if (url.origin === authBaseUrl) return json({ accessToken: 'access.renewed' });
+    if (url.origin === accountsBaseUrl && init.method === 'GET') return json(editableProfile);
+    throw new Error(`Unexpected request ${init.method} ${url}`);
+  }));
+
+  render(<AccountHub accountsBaseUrl={accountsBaseUrl} authBaseUrl={authBaseUrl} />);
+  expect(await screen.findByRole('heading', { name: 'Your account' })).toBeTruthy();
+  expect(await screen.findByText('Sign in to create or edit your profile.')).toBeTruthy();
+
+  fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'player@example.com' } });
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'not-a-real-password' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+
+  expect(await screen.findByRole('heading', { name: 'Your profile', level: 2 })).toBeTruthy();
+  expect(screen.getByDisplayValue('Alex')).toBeTruthy();
 });
 
 const editableProfile = {

@@ -12,17 +12,22 @@ import '../styles/account-profile.css';
  * Lets a signed-in visitor create or edit the profile fields owned by
  * MS-Accounts. The component never receives or renders an auth-user ID.
  *
- * @param {{ apiBaseUrl?: string, authBaseUrl?: string }} props Public MS-Accounts and MS-Auth origins.
+ * `sessionRevision` is a safe local counter from a companion sign-in control.
+ * It triggers a fresh read after login or logout without passing credentials
+ * between components. `headingLevel` keeps this reusable panel valid both as
+ * its own page and as one part of the account hub.
+ *
+ * @param {{ apiBaseUrl?: string, authBaseUrl?: string, headingLevel?: 1 | 2, sessionRevision?: number }} props Public origins and local presentation state.
  * @returns {import('react').ReactNode} Profile creation or editing surface.
  */
-export default function AccountProfilePanel({ apiBaseUrl, authBaseUrl }) {
+export default function AccountProfilePanel({ apiBaseUrl, authBaseUrl, headingLevel = 1, sessionRevision = 0 }) {
   const [profile, setProfile] = useState(undefined);
   const [phase, setPhase] = useState('loading');
   const [status, setStatus] = useState('Loading your profile…');
 
   useEffect(() => {
     void loadProfile();
-  }, [apiBaseUrl, authBaseUrl]);
+  }, [apiBaseUrl, authBaseUrl, sessionRevision]);
 
   async function loadProfile() {
     if (!apiBaseUrl || !authBaseUrl) {
@@ -97,9 +102,10 @@ export default function AccountProfilePanel({ apiBaseUrl, authBaseUrl }) {
   if (phase === 'unavailable' || phase === 'signed-out') return <p aria-live="polite">{status}</p>;
 
   const editing = profile !== undefined;
+  const Heading = headingLevel === 2 ? 'h2' : 'h1';
   return (
     <section className="account-profile" aria-labelledby="account-profile-heading">
-      <h1 id="account-profile-heading">{editing ? 'Your profile' : 'Create your profile'}</h1>
+      <Heading id="account-profile-heading">{editing ? 'Your profile' : 'Create your profile'}</Heading>
       <p aria-live="polite">{status}</p>
       <form onSubmit={handleSubmit}>
         <label htmlFor="profile-editor-display-name">Display name</label>

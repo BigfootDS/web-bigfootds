@@ -50,6 +50,23 @@ test('creates an honest directory that derives availability only from publicatio
     }]),
     /invalid featuredOrder/
   );
+  assert.throws(
+    () => createProjectDiscoveryIndex([
+      {
+        description: 'First selected project.',
+        featuredOrder: 1,
+        id: 'first-featured-project',
+        title: 'First selected project'
+      },
+      {
+        description: 'Second selected project.',
+        featuredOrder: 1,
+        id: 'second-featured-project',
+        title: 'Second selected project'
+      }
+    ]),
+    /duplicate featuredOrder/
+  );
 });
 
 test('reads bounded URL state and ignores unsupported lifecycle and sort values', () => {

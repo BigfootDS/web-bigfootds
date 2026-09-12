@@ -22,16 +22,23 @@ export function createProjectDiscoveryIndex(projects) {
     throw new Error(`Project discovery supports at most ${maximumProjectCount} projects; received ${projects.length}.`);
   }
 
+  const featuredOrders = new Set();
   return projects.map((project, index) => {
     const id = readBoundedText(project.id, 'id', maximumProjectIdLength, index);
     const title = readBoundedText(project.title, 'title', maximumProjectTitleLength, index);
     const description = readBoundedText(project.description, 'description', maximumProjectDescriptionLength, index);
     const publishedAt = readPublishedAt(project.publishedAt, index);
+    const featuredOrder = readFeaturedOrder(project.featuredOrder, index);
+
+    if (featuredOrder !== undefined && featuredOrders.has(featuredOrder)) {
+      throw new Error(`Project discovery has duplicate featuredOrder ${featuredOrder}.`);
+    }
+    if (featuredOrder !== undefined) featuredOrders.add(featuredOrder);
 
     return {
       availability: publishedAt === undefined ? 'coming-soon' : 'available',
       description,
-      ...readFeaturedOrder(project.featuredOrder, index),
+      ...(featuredOrder === undefined ? {} : { featuredOrder }),
       href: `/projects/${id}/`,
       id,
       ...(publishedAt === undefined ? {} : { publishedAt }),
@@ -146,11 +153,11 @@ function readPublishedAt(value, index) {
 }
 
 function readFeaturedOrder(value, index) {
-  if (value === undefined) return {};
+  if (value === undefined) return undefined;
   if (!Number.isSafeInteger(value) || value < 1 || value > 12) {
     throw new Error(`Project discovery item ${index + 1} has an invalid featuredOrder.`);
   }
-  return { featuredOrder: value };
+  return value;
 }
 
 function normaliseAvailability(value) {

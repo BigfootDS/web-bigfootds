@@ -23,7 +23,7 @@ The repository of this front-end web-app is publicly visible since it holds no A
 
 ## Core website journeys
 
-The primary header keeps the current public journeys compact: Home, About, News, Projects and Accounts. Home uses the generated public MS-News snapshot to feature up to three latest published posts, then features up to three currently published project pages. If a build contains no public News, it omits that section instead of using placeholder content.
+The primary header keeps the current public journeys compact: Home, About, News, Projects and Accounts. Home uses the generated public MS-News snapshot to feature up to three latest published posts, then features up to three explicitly selected project pages. If a build contains no public News, it omits that section instead of using placeholder content.
 
 `/projects/` is a static directory rather than a service-backed catalogue. It supports literal title-and-description search, the existing Available now/Coming soon split (derived only from the optional project publication date), and newest, oldest or title sorting. Its state is shareable through `q`, `availability`, and `sort` query parameters. The directory intentionally does not claim technology, brand, platform or richer project-status metadata until those fields exist in the content source.
 

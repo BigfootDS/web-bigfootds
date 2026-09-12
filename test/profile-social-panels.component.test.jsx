@@ -100,6 +100,31 @@ test('refreshes profile controls after sign-in on the combined account screen', 
   expect(screen.getByDisplayValue('Alex')).toBeTruthy();
 });
 
+test('does not restore a deferred profile response after local sign-out', async () => {
+  writeSession({ accessToken: 'access.current', refreshToken: 'refresh.current' });
+  let resolveProfileResponse;
+  const profileResponse = new Promise((resolve) => {
+    resolveProfileResponse = resolve;
+  });
+  vi.stubGlobal('fetch', vi.fn(async (input, init) => {
+    const url = new URL(input);
+    if (url.origin === authBaseUrl) return json({ accessToken: 'access.renewed' });
+    if (url.origin === accountsBaseUrl && init.method === 'GET') return profileResponse;
+    throw new Error(`Unexpected request ${init.method} ${url}`);
+  }));
+
+  render(<AccountHub accountsBaseUrl={accountsBaseUrl} authBaseUrl={authBaseUrl} />);
+  expect(await screen.findByRole('heading', { name: 'Account session' })).toBeTruthy();
+  await waitFor(() => expect(fetch).toHaveBeenCalledWith(expect.any(URL), expect.objectContaining({ method: 'GET' })));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Sign out on this browser' }));
+  resolveProfileResponse(json(editableProfile));
+
+  expect(await screen.findByText('Sign in to create or edit your profile.')).toBeTruthy();
+  expect(screen.queryByRole('heading', { name: 'Your profile' })).toBeNull();
+  expect(screen.queryByDisplayValue('Alex')).toBeNull();
+});
+
 const editableProfile = {
   biography: '',
   displayName: 'Alex',

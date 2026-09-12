@@ -47,6 +47,16 @@ At this foundation stage, the browser sends a token pair only to MS-Auth:
 
 Do not reuse those header names blindly for another microservice. Each future authenticated browser feature must document and test that service's pair transport before it makes a request. Public news and Events remain anonymous and fully usable without a session.
 
+## Profiles and connections
+
+`/profiles/?name=Display%20Name` looks up the public-safe profile returned by MS-Accounts. It sends no token and never receives an MS-Auth user ID, private social link, relationship state, or staff data. The result is deliberately query-addressable because this static host cannot generate an unbounded route for every future display name.
+
+`/account/profile/` is the owner-only profile editor. It sends the selected access token as `Authorization: Bearer`, `accessToken`, and sends `refreshToken` alongside it. MS-Accounts retains its established bearer validation and does not persist or forward the browser refresh token. The editor submits only MS-Accounts' editable fields: display name, biography, nameplate, profile-picture layer URLs, tag, and the complete visibility-aware social-link collection.
+
+`/account/connections/` is separate because relationships are owned by MS-UserRelations, not profile data. Its requests send the pair in `accessToken` and `refreshToken` headers, without a client `Authorization` header; that service derives the caller through its MS-Auth introspection boundary. The existing relationship API exposes opaque account IDs only. Public profile data intentionally cannot map a display name to such an ID, so friend and block actions require an account ID shared through another agreed product flow. The website does not infer a relationship from a profile or expose a public friends list.
+
+These browser routes fail closed as unavailable until a separately approved Pages workflow change maps the existing canonical organisation variables into `PUBLIC_MS_ACCOUNTS_BASE_URL` and `PUBLIC_MS_USERRELATIONS_BASE_URL`. They are implementation details, not new organisation variables. Before release, set each deployed service's exact `CORS_ALLOWED_ORIGINS` to `https://bigfootds.com`: MS-Accounts needs its separately approved CD environment mapping added, while MS-UserRelations already supports that variable. Keep MS-Auth's exact origin configuration in place as well. All three browser callers omit cookies, use `no-store`, and apply a no-referrer policy.
+
 ## Build Your Own
 
 This project is based on the "Astro Starter Kit: Blog" project template. Make your own with this command in your NodeJS-ready terminal:

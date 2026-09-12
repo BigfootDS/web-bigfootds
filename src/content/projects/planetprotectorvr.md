@@ -3,6 +3,7 @@ title: 'Planet Protector VR'
 description: 'Defend your city from alien invaders in this colorful virtual reality game!'
 pubDate: 'Oct 13 2017'
 heroImage: '/projects/ppvr/LibraryHeader.png'
+featuredOrder: 1
 ---
 
 Defend your city from alien invaders in this colorful virtual reality game! Aim, shoot, and protect your planet for as long as you can in a variety of game modes & special missions!

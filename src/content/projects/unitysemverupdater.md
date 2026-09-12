@@ -1,15 +1,16 @@
 ---
 title: 'Unity Semver Updater'
-description: "NodeJS tool to update a Unity project's version to a specified format - typically the semver format."
+description: "A NodeJS tool that updates a Unity project's version to a specified format, typically semantic versioning."
 pubDate: 'Jul 10 2024'
-heroImage: '/projects/USEM/maincapsule.jpg'
+updatedDate: 'Aug 27 2026'
+heroImage: 'https://opengraph.githubassets.com/1/BigfootDS/pkg-unity-semver-updater'
 ---
 
 Unity Semver Updater is a NodeJS tool to update a Unity project's version to a specified format - typically the semver format.
 
 ## Quick Info
 
-- [GitHub Repository.](https://github.com/BigfootDS/unity-semver-updater)
+- [GitHub Repository.](https://github.com/BigfootDS/pkg-unity-semver-updater)
 - [NPM Package Webpage.](https://www.npmjs.com/package/@bigfootds/unity-semver-updater)
 
 

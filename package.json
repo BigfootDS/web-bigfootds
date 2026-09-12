@@ -8,7 +8,8 @@
     "news:sync": "node scripts/sync-news.mjs",
     "prebuild": "npm run news:sync && npm run events:sync",
     "build": "astro build",
-    "test": "node --test",
+    "test": "node --test && npm run test:components",
+    "test:components": "vitest run",
     "preview": "astro preview",
     "astro": "astro"
   },
@@ -26,6 +27,7 @@
     "@astrojs/react": "^4.1.1",
     "@astrojs/rss": "^4.0.10",
     "@astrojs/sitemap": "^3.2.1",
+    "@iconify-json/simple-icons": "^1.2.16",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",
     "astro": "^5.0.9",
@@ -33,10 +35,11 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.7.2",
-    "@iconify-json/simple-icons": "^1.2.16",
     "yet-another-react-lightbox": "^3.32.2"
   },
   "devDependencies": {
-    
+    "@testing-library/react": "^16.3.0",
+    "jsdom": "^26.1.0",
+    "vitest": "^3.2.4"
   }
 }

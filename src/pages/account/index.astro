@@ -16,6 +16,8 @@ import Header from '../../components/Header.astro';
 			<h1>Account</h1>
 			<p>Sign in when a BigfootDS feature asks you to connect your account.</p>
 			<BrowserAuthSessionPanel client:load apiBaseUrl={import.meta.env.PUBLIC_MS_AUTH_BASE_URL} />
+			<p><a href="/account/profile/">Create or edit your profile</a></p>
+			<p><a href="/account/connections/">Manage connections</a></p>
 		</main>
 		<Footer />
 	</body>

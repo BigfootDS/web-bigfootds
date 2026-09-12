@@ -1,0 +1,20 @@
+---
+import AccountProfilePanel from '../../../components/AccountProfilePanel.jsx';
+import BaseHead from '../../../components/BaseHead.astro';
+import Footer from '../../../components/Footer.astro';
+import Header from '../../../components/Header.astro';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title="Your profile" description="Create or edit your BigfootDS profile." />
+	</head>
+	<body>
+		<Header />
+		<main>
+			<AccountProfilePanel client:load apiBaseUrl={import.meta.env.PUBLIC_MS_ACCOUNTS_BASE_URL} authBaseUrl={import.meta.env.PUBLIC_MS_AUTH_BASE_URL} />
+		</main>
+		<Footer />
+	</body>
+</html>

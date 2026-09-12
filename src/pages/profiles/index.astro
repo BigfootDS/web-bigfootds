@@ -1,0 +1,20 @@
+---
+import BaseHead from '../../components/BaseHead.astro';
+import Footer from '../../components/Footer.astro';
+import Header from '../../components/Header.astro';
+import ProfileDiscovery from '../../components/ProfileDiscovery.jsx';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title="Profiles" description="Find public BigfootDS profiles." />
+	</head>
+	<body>
+		<Header />
+		<main>
+			<ProfileDiscovery client:load apiBaseUrl={import.meta.env.PUBLIC_MS_ACCOUNTS_BASE_URL} />
+		</main>
+		<Footer />
+	</body>
+</html>

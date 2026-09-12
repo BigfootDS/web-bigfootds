@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   EditorialNewsApiError,
   createEditorialMediaUploadIntentRequest,
+  createEditorialMediaPreviewRequest,
   createEditorialNewsListRequest,
   createEditorialNewsPostInput,
   createEditorialNewsPostRequest,
@@ -12,6 +13,7 @@ import {
   readEditorialMediaUploadIntent,
   readEditorialNewsList,
   readEditorialNewsPost,
+  readEditorialNewsPostResponse,
   readPublicEditorialNewsBaseUrl
 } from '../src/lib/editorial-news-api.mjs';
 
@@ -152,6 +154,28 @@ test('keeps the upload form capability separate from user credentials and reject
   });
   assert.deepEqual(completed.dimensions, { height: 180, width: 320 });
   assert.throws(() => readEditorialMediaUploadIntent({ result: { ...upload, storageObjectKey: 'private' } }), isInvalidResponseError);
+});
+
+test('uses only the bearer credential for a preview redirect to keep the token pair out of storage', () => {
+  const request = createEditorialMediaPreviewRequest({ apiBaseUrl, assetId, session });
+
+  assert.equal(request.url.href, `https://news.bigfootds.dev/api/v1/editorial/news-media/${assetId}/preview`);
+  assert.equal(request.init.headers.get('Authorization'), 'Bearer access.token-1');
+  assert.equal(request.init.headers.get('accessToken'), null);
+  assert.equal(request.init.headers.get('refreshToken'), null);
+  assert.equal(request.init.credentials, 'omit');
+  assert.equal(request.init.referrerPolicy, 'no-referrer');
+});
+
+test('keeps server-side content validation distinct from session rejection', async () => {
+  await assert.rejects(
+    readEditorialNewsPostResponse(new Response(null, { status: 400 })),
+    isValidationError
+  );
+  await assert.rejects(
+    readEditorialNewsPostResponse(new Response(null, { status: 403 })),
+    (error) => error instanceof EditorialNewsApiError && error.kind === 'rejected'
+  );
 });
 
 function validDocument() {

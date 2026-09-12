@@ -166,17 +166,28 @@ export function createEditorialMediaCompleteRequest({ apiBaseUrl, assetId, sessi
 }
 
 /**
- * Creates the authenticated draft-image preview request. The endpoint redirects
- * to a signed storage URL; callers must keep any resulting blob URL in memory
- * and revoke it when the editor no longer needs it.
+ * Creates the bearer-only draft-image preview request. The endpoint redirects
+ * to a signed storage URL, so it intentionally omits the custom access and
+ * refresh headers that normal editorial requests carry. Fetch removes the
+ * standard `Authorization` header before a cross-origin redirect, keeping the
+ * browser token pair out of Cloud Storage. Callers keep any resulting blob URL
+ * in memory and revoke it when the editor no longer needs it.
  */
 export function createEditorialMediaPreviewRequest({ apiBaseUrl, assetId, session }) {
-  return createEditorialRequest({
-    apiBaseUrl,
-    method: 'GET',
-    pathname: `/api/v1/editorial/news-media/${readAssetId(assetId)}/preview`,
-    session
-  });
+  const safeSession = readSession(session);
+  return {
+    init: {
+      cache: 'no-store',
+      credentials: 'omit',
+      headers: new Headers({ accept: 'image/*', Authorization: `Bearer ${safeSession.accessToken}` }),
+      method: 'GET',
+      referrerPolicy: 'no-referrer'
+    },
+    url: new URL(
+      `/api/v1/editorial/news-media/${readAssetId(assetId)}/preview`,
+      readPublicEditorialNewsBaseUrl(apiBaseUrl)
+    )
+  };
 }
 
 /**
@@ -592,6 +603,7 @@ function isHttpsUrl(value) {
 }
 
 function responseError(status) {
+  if (status === 400 || status === 422) return new EditorialNewsApiError('validation');
   if (status === 404) return new EditorialNewsApiError('not-found');
   if (status === 409) return new EditorialNewsApiError('conflict');
   return new EditorialNewsApiError(status >= 500 ? 'unavailable' : 'rejected');

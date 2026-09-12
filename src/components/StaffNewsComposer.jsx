@@ -280,7 +280,7 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
   }
 
   function insertGallery() {
-    const images = assets.filter((asset) => selectedAssets.includes(asset.assetId));
+    const images = selectedAssets.map((assetId) => assets.find((asset) => asset.assetId === assetId)).filter(Boolean);
     if (images.length < 2) {
       setStatus('Select at least two verified images to insert a gallery.');
       return;
@@ -290,6 +290,17 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
       content: images.map((asset) => ({ attrs: assetToImageAttrs(asset), type: 'image' })),
       type: 'imageGallery'
     }).run();
+  }
+
+  function moveGalleryAsset(assetId, direction) {
+    setSelectedAssets((current) => {
+      const index = current.indexOf(assetId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
+      const next = [...current];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
   }
 
   function insertYoutube(event) {
@@ -374,6 +385,16 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
                 <label><input checked={selectedAssets.includes(asset.assetId)} onChange={() => toggleGalleryAsset(asset.assetId)} type="checkbox" /> Include in gallery</label>
               </li>)}
             </ul>
+            {selectedAssets.length > 0 && <ol className="staff-news__gallery-order" aria-label="Gallery image order">
+              {selectedAssets.map((assetId, index) => {
+                const asset = assets.find((candidate) => candidate.assetId === assetId);
+                return asset === undefined ? null : <li key={asset.assetId}>
+                  <span>{asset.alt}</span>
+                  <button type="button" onClick={() => moveGalleryAsset(asset.assetId, -1)} disabled={index === 0}>Move earlier</button>
+                  <button type="button" onClick={() => moveGalleryAsset(asset.assetId, 1)} disabled={index === selectedAssets.length - 1}>Move later</button>
+                </li>;
+              })}
+            </ol>}
             <label>Gallery layout<select value={galleryLayout} onChange={(event) => setGalleryLayout(event.target.value)}><option value="carousel">Carousel</option><option value="grid">Grid</option></select></label>
             <button type="button" onClick={insertGallery}>Insert selected gallery</button>
           </>}
@@ -389,7 +410,12 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
   );
 }
 
-function StaffNewsRichEditor({ disabled, document, onChange, onReady }) {
+/**
+ * Hosts the bounded Tiptap surface and applies lifecycle lock changes to the
+ * existing editor instance. Tiptap does not update `editable` from later hook
+ * options, so publication transitions require the explicit effect below.
+ */
+export function StaffNewsRichEditor({ disabled, document, onChange, onReady }) {
   const editor = useEditor({
     content: document,
     editable: !disabled,
@@ -408,18 +434,22 @@ function StaffNewsRichEditor({ disabled, document, onChange, onReady }) {
     return () => onReady(null);
   }, [editor, onReady]);
 
+  useEffect(() => {
+    editor?.setEditable(!disabled);
+  }, [disabled, editor]);
+
   if (!editor) return <p>Loading the editor…</p>;
   return (
     <div className="staff-news-editor">
       <div className="staff-news-editor__toolbar" aria-label="Article formatting">
-        <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} aria-pressed={editor.isActive('bold')}>Bold</button>
-        <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} aria-pressed={editor.isActive('italic')}>Italic</button>
-        <button type="button" onClick={() => editor.chain().focus().toggleStrike().run()} aria-pressed={editor.isActive('strike')}>Strike</button>
-        <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} aria-pressed={editor.isActive('bulletList')}>Bullets</button>
-        <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} aria-pressed={editor.isActive('orderedList')}>Numbered list</button>
-        <button type="button" onClick={() => editor.chain().focus().toggleBlockquote().run()} aria-pressed={editor.isActive('blockquote')}>Quote</button>
-        <button type="button" onClick={() => editor.chain().focus().setHorizontalRule().run()}>Rule</button>
-        <button type="button" onClick={() => setLink(editor)}>Link</button>
+        <button type="button" disabled={disabled} onClick={() => editor.chain().focus().toggleBold().run()} aria-pressed={editor.isActive('bold')}>Bold</button>
+        <button type="button" disabled={disabled} onClick={() => editor.chain().focus().toggleItalic().run()} aria-pressed={editor.isActive('italic')}>Italic</button>
+        <button type="button" disabled={disabled} onClick={() => editor.chain().focus().toggleStrike().run()} aria-pressed={editor.isActive('strike')}>Strike</button>
+        <button type="button" disabled={disabled} onClick={() => editor.chain().focus().toggleBulletList().run()} aria-pressed={editor.isActive('bulletList')}>Bullets</button>
+        <button type="button" disabled={disabled} onClick={() => editor.chain().focus().toggleOrderedList().run()} aria-pressed={editor.isActive('orderedList')}>Numbered list</button>
+        <button type="button" disabled={disabled} onClick={() => editor.chain().focus().toggleBlockquote().run()} aria-pressed={editor.isActive('blockquote')}>Quote</button>
+        <button type="button" disabled={disabled} onClick={() => editor.chain().focus().setHorizontalRule().run()}>Rule</button>
+        <button type="button" disabled={disabled} onClick={() => setLink(editor)}>Link</button>
       </div>
       <EditorContent editor={editor} />
     </div>

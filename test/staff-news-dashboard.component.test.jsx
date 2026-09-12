@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
-import StaffNewsComposer from '../src/components/StaffNewsComposer.jsx';
+import StaffNewsComposer, { StaffNewsRichEditor } from '../src/components/StaffNewsComposer.jsx';
 import StaffNewsDashboard from '../src/components/StaffNewsDashboard.jsx';
 import { BROWSER_AUTH_SESSION_STORAGE_KEY } from '../src/lib/browser-auth-session.mjs';
 
@@ -77,6 +77,17 @@ test('renders the new-draft composer only after MS-Auth verifies the stored sess
   await screen.findByRole('heading', { name: 'New News draft' });
   expect(screen.getByRole('button', { name: 'Save draft' })).toBeTruthy();
   expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+});
+
+test('updates the existing Tiptap instance when publication changes editability', async () => {
+  const onChange = vi.fn();
+  const onReady = vi.fn();
+  const document = { content: [{ type: 'paragraph' }], type: 'doc' };
+  const { container, rerender } = render(<StaffNewsRichEditor disabled document={document} onChange={onChange} onReady={onReady} />);
+
+  await waitFor(() => expect(container.querySelector('.tiptap')?.getAttribute('contenteditable')).toBe('false'));
+  rerender(<StaffNewsRichEditor disabled={false} document={document} onChange={onChange} onReady={onReady} />);
+  await waitFor(() => expect(container.querySelector('.tiptap')?.getAttribute('contenteditable')).toBe('true'));
 });
 
 function json(value) {

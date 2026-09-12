@@ -21,6 +21,14 @@ Building this as a classroom example / optional extra-curricular example project
 
 The repository of this front-end web-app is publicly visible since it holds no API keys or other sensitive data - the back-end servers / microservices will remain private though, as they do have keys and security logic that would become useless if it were public. White-label projects of the back-ends will be made during classes, it's really not special - but things like the JWT decryption keys cannot be shared.
 
+## Core website journeys
+
+The primary header keeps the current public journeys compact: Home, About, News, Projects and Accounts. Home uses the generated public MS-News snapshot to feature up to three latest published posts, then features up to three currently published project pages. If a build contains no public News, it omits that section instead of using placeholder content.
+
+`/projects/` is a static directory rather than a service-backed catalogue. It supports literal title-and-description search, the existing Available now/Coming soon split (derived only from the optional project publication date), and newest, oldest or title sorting. Its state is shareable through `q`, `availability`, and `sort` query parameters. The directory intentionally does not claim technology, brand, platform or richer project-status metadata until those fields exist in the content source.
+
+Public Events and public profile lookup remain available from their direct URLs, while staff News administration remains unlinked from public navigation. Forum work is deliberately deferred until MS-Forum has a separately approved runnable service contract.
+
 ## Browser account sessions
 
 `/account/` is the direct-client account-management screen. It brings the MS-Auth sign-in controls and the MS-Accounts self-profile editor together without merging their responsibilities. On a successful sign-in it retains only the returned access-token and refresh-token pair in the visitor's `localStorage`; the password, email, raw service errors, and tokens do not belong in the URL, static output, rendered HTML, analytics, or browser-visible error copy. Sign-out removes the local pair only. MS-Auth remains responsible for the persisted refresh-token state, while MS-Accounts remains responsible for profile data.

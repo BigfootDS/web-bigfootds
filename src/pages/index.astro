@@ -1,35 +1,161 @@
 ---
+import { getCollection } from 'astro:content';
+
 import BaseHead from '../components/BaseHead.astro';
-import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
-import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
+import FormattedDate from '../components/FormattedDate.astro';
+import Header from '../components/Header.astro';
+import { SITE_DESCRIPTION } from '../consts';
+import { selectFeaturedProjects, selectLatestNews } from '../lib/home-discovery.mjs';
+import { createProjectDiscoveryIndex } from '../lib/project-discovery.mjs';
+import { getGeneratedPublicNews } from '../lib/public-news.mjs';
+
+const newsPosts = await getGeneratedPublicNews();
+const latestNews = selectLatestNews(newsPosts);
+const projectEntries = await getCollection('projectPages');
+const projectImages = new Map(projectEntries.map((project) => [project.id, project.data.heroImage]));
+const projectDirectory = createProjectDiscoveryIndex(projectEntries.map((project) => ({
+	description: project.data.description,
+	id: project.id,
+	publishedAt: project.data.pubDate,
+	title: project.data.title
+})));
+const featuredProjects = selectFeaturedProjects(projectDirectory).map((project) => ({
+	...project,
+	heroImage: projectImages.get(project.id)
+}));
 ---
 
 <!doctype html>
 <html lang="en">
 	<head>
-		<BaseHead title={""} description={SITE_DESCRIPTION} />
+		<BaseHead title="" description={SITE_DESCRIPTION} />
 	</head>
 	<body>
 		<Header />
-		<main>
-			<h1>You found Bigfoot!</h1>
-			<p>
-				Welcome to the official BigfootDS website, where you can learn more about our games and software projects.
-			</p>
-			<p>
-				You can also keep up to date with any articles we've posted, over in <a href="/news">the News section</a>.
-			</p>
-			<p>
-				Or, you can learn more about BigfootDS, over in <a href="/about">the About section</a>.
-			</p>
-			<p>
-				You can dive deeper into our work on the <a href="/projects">the Projects section</a>, too!
-			</p>
-			<p>
-				And of course, feel free to check us out on social media platforms or contact us using the links shown below.
-			</p>
+		<main class="home">
+			<section class="home-hero" aria-labelledby="home-heading">
+				<h1 id="home-heading">You found Bigfoot!</h1>
+				<p>Welcome to BigfootDS. Explore the games, tools and experiments we are making, or catch up on the latest news.</p>
+				<nav class="home-actions" aria-label="Explore BigfootDS">
+					<a href="/news/">Read the latest news</a>
+					<a href="/projects/">Explore projects</a>
+					<a href="/about/">About BigfootDS</a>
+				</nav>
+			</section>
+
+			{
+				latestNews.length > 0 && (
+					<section aria-labelledby="latest-news-heading">
+						<div class="section-heading">
+							<h2 id="latest-news-heading">Latest news</h2>
+							<a href="/news/">All news</a>
+						</div>
+						<ul class="home-card-list">
+							{latestNews.map((post) => (
+								<li>
+									<article class="home-card">
+										<p class="home-card-meta"><FormattedDate date={new Date(post.publishAt)} /> · {post.category}</p>
+										<h3><a href={`/news/${post.id}/`}>{post.content.title}</a></h3>
+										<p>{post.content.summary}</p>
+									</article>
+								</li>
+							))}
+						</ul>
+					</section>
+				)
+			}
+
+			{
+				featuredProjects.length > 0 && (
+					<section aria-labelledby="featured-projects-heading">
+						<div class="section-heading">
+							<h2 id="featured-projects-heading">Featured projects</h2>
+							<a href="/projects/">All projects</a>
+						</div>
+						<ul class="home-card-list">
+							{featuredProjects.map((project) => (
+								<li>
+									<article class="home-card">
+										{project.heroImage !== undefined && <img src={project.heroImage} alt="" loading="lazy" />}
+										<p class="home-card-meta">Available now</p>
+										<h3><a href={project.href}>{project.title}</a></h3>
+										<p>{project.description}</p>
+									</article>
+								</li>
+							))}
+						</ul>
+					</section>
+				)
+			}
 		</main>
 		<Footer />
 	</body>
 </html>
+
+<style>
+	.home {
+		display: grid;
+		gap: 3rem;
+		max-width: 1120px;
+		margin: 0 auto;
+	}
+
+	.home-hero {
+		padding: clamp(1.5rem, 4vw, 4rem);
+		border-radius: 0.75rem;
+		background: light-dark(var(--theme-100), var(--theme-900));
+	}
+
+	.home-hero h1 {
+		margin-top: 0;
+	}
+
+	.home-actions,
+	.section-heading {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem 1rem;
+	}
+
+	.home-actions a {
+		display: inline-block;
+		padding: 0.6rem 0.8rem;
+		border: 1px solid currentcolor;
+		border-radius: 0.25rem;
+	}
+
+	.section-heading {
+		justify-content: space-between;
+	}
+
+	.section-heading h2 {
+		margin: 0;
+	}
+
+	.home-card-list {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+		gap: 1rem;
+		padding: 0;
+		list-style: none;
+	}
+
+	.home-card {
+		height: 100%;
+		padding: 1rem;
+		border: 1px solid var(--theme-700);
+		border-radius: 0.5rem;
+	}
+
+	.home-card img {
+		width: 100%;
+		height: auto;
+		border-radius: 0.25rem;
+	}
+
+	.home-card-meta {
+		font-size: 0.85em;
+	}
+</style>

@@ -9,12 +9,13 @@ import { SITE_DESCRIPTION } from '../../consts';
 import { createProjectDiscoveryIndex } from '../../lib/project-discovery.mjs';
 
 const projectEntries = await getCollection('projectPages');
+const projectImages = new Map(projectEntries.map((project) => [project.id, project.data.heroImage]));
 const projects = createProjectDiscoveryIndex(projectEntries.map((project) => ({
 	description: project.data.description,
 	id: project.id,
 	publishedAt: project.data.pubDate,
 	title: project.data.title
-})));
+}))).map((project) => ({ ...project, heroImage: projectImages.get(project.id) }));
 ---
 
 <!doctype html>

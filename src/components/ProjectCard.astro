@@ -5,7 +5,8 @@ const projectData: ProjectData = Astro.props;
 
 const projectImages = import.meta.glob<{ default: ImageMetadata }>('/src/assets/images/projects/*/*.{jpeg,jpg,png,gif}');
 
-let maincapsulePath = `/src/assets/images/projects/${projectData.abbreviation}/maincapsule.jpg`;
+const cardImageExtension = projectData.cardImageExtension ?? 'jpg';
+let maincapsulePath = `/src/assets/images/projects/${projectData.abbreviation}/maincapsule.${cardImageExtension}`;
 
 interface Props extends ProjectData {};
 

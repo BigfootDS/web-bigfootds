@@ -28,17 +28,21 @@ test('includes the current BigfootDS semantic-versioning project suite', async (
   }
 });
 
-test('sets the approved Home feature order and retains the Godmaker route', async () => {
-  const [planetProtector, godmaker, gameAutomated] = await Promise.all([
-    readProjectFrontmatter('planetprotectorvr.md'),
-    readProjectFrontmatter('patronsimulator.mdx'),
-    readProjectFrontmatter('gameautomatedsemver.md')
-  ]);
+test('sets the approved Home feature order and serves Godmaker from its current route with local artwork', async () => {
+	const [planetProtector, godmaker, gameAutomated] = await Promise.all([
+		readProjectFrontmatter('planetprotectorvr.md'),
+		readProjectFrontmatter('godmaker.mdx'),
+		readProjectFrontmatter('gameautomatedsemver.md')
+	]);
 
-  assert.match(planetProtector, /^featuredOrder: 1$/m);
-  assert.match(godmaker, /^title: 'Godmaker: Patrons & Prophets'$/m);
-  assert.match(godmaker, /^featuredOrder: 2$/m);
-  assert.match(gameAutomated, /^featuredOrder: 3$/m);
+	assert.match(planetProtector, /^featuredOrder: 1$/m);
+	assert.match(godmaker, /^title: 'Godmaker: Patrons & Prophets'$/m);
+	assert.match(godmaker, /^heroImage: '\/projects\/godmaker\/SteamHeaderCapsule\.png'$/m);
+	assert.match(godmaker, /^featuredOrder: 2$/m);
+	assert.match(gameAutomated, /^featuredOrder: 3$/m);
+	const heroImage = await readFile(resolve(process.cwd(), 'public/projects/godmaker/SteamHeaderCapsule.png'));
+	assert.ok(heroImage.byteLength > 0, 'Godmaker local card artwork should be published with the static site');
+	await assert.rejects(readFile(resolve(projectsPath, 'patronsimulator.mdx')));
 });
 
 test('adds the other approved current BigfootDS project cards', async () => {

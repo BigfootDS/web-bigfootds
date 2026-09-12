@@ -14,6 +14,11 @@ export interface ProjectData {
 	platforms: ProjectPlatformsData[];
 	type: "game" | "package" | "app";
 	abbreviation: string;
+	/**
+	 * Image file extension for the legacy `/work/` card asset. The default is
+	 * JPEG; projects with a versioned PNG Steam asset must opt in explicitly.
+	 */
+	cardImageExtension?: "jpg" | "png";
 	tagline: string;
 	releaseYear?: string;
 	ytIframeString?: string;
@@ -52,15 +57,16 @@ export const dataGamesReleased: Array<ProjectData> = [
 
 export const dataGamesWip: Array<ProjectData> = [
 	{
-		abbreviation: "PSIM",
-		title: "Patron Simulator",
+		abbreviation: "GODM",
+		cardImageExtension: "png",
+		title: "Godmaker: Patrons & Prophets",
 		type: "game",
 		tagline: "Become the ultimate patron of power in your own fantasy world! Build your gathering of followers, manipulate the mortal realm and grow your godhood to become the highest power in reality.",
 		releaseYear: "Late 2025",
 		platforms: [
 			{
 				name: "Steam",
-				url: "https://store.steampowered.com/app/1792550/Patron_Simulator/"
+				url: "https://store.steampowered.com/app/1792550/"
 			}
 		]
 	}

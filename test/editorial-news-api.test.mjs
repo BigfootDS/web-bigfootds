@@ -53,12 +53,9 @@ test('requires a bare public MS-News origin and uses the documented direct-clien
 test('serialises only validated editor fields and a strict UTC schedule', () => {
   assert.deepEqual(createEditorialNewsPostInput({
     category: 'announcement',
-    document: validDocument(),
-    locale: 'en-AU',
+    contents: [{ document: validDocument(), locale: 'en-AU', summary: 'A safe summary.', title: 'A safe title' }],
     projectId: 'website',
-    summary: 'A safe summary.',
-    tags: ['release'],
-    title: 'A safe title'
+    tags: ['release']
   }), validPostInput());
   assert.deepEqual(createEditorialNewsScheduleInput({
     publishAt: '2026-09-12T04:00:00.000Z',

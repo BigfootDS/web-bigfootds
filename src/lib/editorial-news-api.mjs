@@ -253,20 +253,37 @@ export async function readEditorialNewsPostResponse(response) {
  * It normalises the Tiptap subset locally as a helpful early failure, while
  * MS-News repeats its authoritative validation before persistence.
  *
- * @param {{ category: string, document: unknown, locale: string, projectId: string, summary: string, tags: readonly string[], title: string }} input One localised rich post.
+ * @param {{ category: string, contents?: readonly { document: unknown, locale: string, summary: string, title: string }[], document?: unknown, locale?: string, projectId: string, summary?: string, tags: readonly string[], title?: string }} input One or more localised rich post entries.
  * @returns {{ category: string, content: readonly object[], projectId: string, tags: readonly string[] }} Valid MS-News create/edit body.
  */
 export function createEditorialNewsPostInput(input) {
   const tags = readSlugList(input.tags);
-  const document = normaliseRichNewsDocument(input.document);
+  const contentInputs = input.contents === undefined
+    ? [{ document: input.document, locale: input.locale, summary: input.summary, title: input.title }]
+    : input.contents;
+  if (!Array.isArray(contentInputs) || contentInputs.length === 0 || contentInputs.length > 20) {
+    throw new EditorialNewsApiError('validation');
+  }
+  const content = contentInputs.map((entry) => {
+    if (!isRecord(entry)) throw new EditorialNewsApiError('validation');
+    try {
+      return {
+        document: normaliseRichNewsDocument(entry.document),
+        locale: readLocale(entry.locale),
+        summary: readRequiredText(entry.summary, 600),
+        title: readRequiredText(entry.title, 200)
+      };
+    } catch (error) {
+      if (error instanceof EditorialNewsApiError) throw error;
+      throw new EditorialNewsApiError('validation');
+    }
+  });
+  if (new Set(content.map((entry) => entry.locale)).size !== content.length) {
+    throw new EditorialNewsApiError('validation');
+  }
   return {
     category: readSlug(input.category),
-    content: [{
-      document,
-      locale: readLocale(input.locale),
-      summary: readRequiredText(input.summary, 600),
-      title: readRequiredText(input.title, 200)
-    }],
+    content,
     projectId: readSlug(input.projectId),
     tags
   };
@@ -379,17 +396,13 @@ export async function sendEditorialMediaUpload({ fetchImpl = fetch, file, upload
 }
 
 /**
- * Follows the attested staff preview redirect once and returns an in-memory
- * object URL. A durable `<img>` cannot attach the required staff headers, so
- * this avoids leaking a signed URL into persisted content or static output.
+ * Converts a completed attested preview fetch into an in-memory object URL.
+ *
+ * The caller owns the fetch so it can apply the one permitted session-renewal
+ * retry. A durable `<img>` cannot attach the required staff headers, so this
+ * avoids leaking a signed URL into persisted content or static output.
  */
-export async function loadEditorialMediaPreview({ fetchImpl = fetch, request, urlApi = URL }) {
-  let response;
-  try {
-    response = await fetchImpl(request.url, request.init);
-  } catch {
-    throw new EditorialNewsApiError('unavailable');
-  }
+export async function readEditorialMediaPreviewResponse({ response, urlApi = URL }) {
   if (!response.ok) throw responseError(response.status);
   try {
     return urlApi.createObjectURL(await response.blob());

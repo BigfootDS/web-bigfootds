@@ -1,0 +1,28 @@
+.profile-discovery {
+	max-width: 48rem;
+	margin: 0 auto;
+}
+
+.profile-discovery form {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: end;
+}
+
+.profile-discovery label {
+	width: 100%;
+}
+
+.profile-discovery input,
+.profile-discovery button {
+	min-height: 2.5rem;
+	font: inherit;
+}
+
+.public-profile {
+	margin-top: 1.5rem;
+	padding: 1rem;
+	border: 1px solid var(--theme-700);
+	border-radius: 0.5rem;
+}

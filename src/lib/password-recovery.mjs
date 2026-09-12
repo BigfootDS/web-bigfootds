@@ -1,4 +1,4 @@
-import { BrowserAuthSessionError, readPublicMsAuthBaseUrl } from './browser-auth-session.mjs';
+import { readPublicMsAuthBaseUrl } from './browser-auth-session.mjs';
 
 export const PASSWORD_RESET_REQUEST_PATH = '/v1/users/public/password-reset-requests';
 export const PASSWORD_RESET_COMPLETION_PATH = '/v1/users/public/password-resets';
@@ -51,7 +51,7 @@ export function consumePasswordResetTokenFromFragment({ history, location }) {
  *
  * @param {{ apiBaseUrl: string | undefined, email: string }} input Visitor-supplied recovery email and public MS-Auth origin.
  * @returns {{ init: RequestInit, url: URL }} Fixed request for MS-Auth.
- * @throws {BrowserAuthSessionError | PasswordRecoveryError} When configuration or input is unsafe.
+ * @throws {import('./browser-auth-session.mjs').BrowserAuthSessionError | PasswordRecoveryError} When configuration or input is unsafe.
  */
 export function createMsAuthPasswordResetRequest(input) {
   return createPublicPasswordRecoveryRequest({
@@ -68,7 +68,7 @@ export function createMsAuthPasswordResetRequest(input) {
  *
  * @param {{ apiBaseUrl: string | undefined, password: string, token: string }} input Fragment token, chosen password, and public MS-Auth origin.
  * @returns {{ init: RequestInit, url: URL }} Fixed request for MS-Auth.
- * @throws {BrowserAuthSessionError | PasswordRecoveryError} When configuration or input is unsafe.
+ * @throws {import('./browser-auth-session.mjs').BrowserAuthSessionError | PasswordRecoveryError} When configuration or input is unsafe.
  */
 export function createMsAuthPasswordResetCompletionRequest(input) {
   return createPublicPasswordRecoveryRequest({

@@ -57,6 +57,16 @@ At this foundation stage, the browser sends a token pair only to MS-Auth:
 
 Do not reuse those header names blindly for another microservice. Each future authenticated browser feature must document and test that service's pair transport before it makes a request. Public news and Events remain anonymous and fully usable without a session.
 
+## Password recovery
+
+`/account/forgot-password/` and `/account/reset-password/` are anonymous MS-Auth screens. They use the same non-secret `PUBLIC_MS_AUTH_BASE_URL` build value as the normal sign-in screen. The website never contacts MS-Email or Postmark, and it has no email-provider or service credential.
+
+The request screen sends `POST /v1/users/public/password-reset-requests` with JSON `{ "email": "..." }`. For every valid-shaped email, it presents the same accepted message. That is deliberate: the screen must not disclose whether the address has a local-password account, an OAuth-only account, an unverified account, or no account at all.
+
+MS-Auth sends its one-time reset token in the link fragment, shaped like `/account/reset-password/#token=<opaque-token>`. A browser does not include the fragment in an HTTP request, but the reset page still removes it from the current history entry as its client-only component starts. It retains the validated token only in component memory, never in local storage, page HTML, a query string, analytics, or a referrer. It then sends `POST /v1/users/public/password-resets` with JSON `{ "token": "...", "password": "..." }` using omitted cookies, `no-store`, an error-on-redirect policy, and no referrer.
+
+The website checks that password confirmation matches before the request, but MS-Auth owns the actual password-policy, token-expiry, single-use, and refresh-token-revocation decisions. A successful reset does not sign the visitor in. They return to `/account/` and sign in with the new password. The security constraints follow the [OWASP Forgot Password Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html).
+
 ## Profiles and connections
 
 `/profiles/?name=Display%20Name` looks up the public-safe profile returned by MS-Accounts. It sends no token and never receives an MS-Auth user ID, private social link, relationship state, or staff data. The result is deliberately query-addressable because this static host cannot generate an unbounded route for every future display name.

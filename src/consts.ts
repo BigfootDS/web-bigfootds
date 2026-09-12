@@ -62,7 +62,6 @@ export const dataGamesWip: Array<ProjectData> = [
 		title: "Godmaker: Patrons & Prophets",
 		type: "game",
 		tagline: "Become the ultimate patron of power in your own fantasy world! Build your gathering of followers, manipulate the mortal realm and grow your godhood to become the highest power in reality.",
-		releaseYear: "Late 2025",
 		platforms: [
 			{
 				name: "Steam",

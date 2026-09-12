@@ -45,6 +45,15 @@ test('sets the approved Home feature order and serves Godmaker from its current 
 	await assert.rejects(readFile(resolve(projectsPath, 'patronsimulator.mdx')));
 });
 
+test('does not represent in-development Godmaker as available on the legacy work surface', async () => {
+	const workProjectData = await readFile(resolve(process.cwd(), 'src/consts.ts'), 'utf8');
+	const godmakerCard = workProjectData.match(/\{\s*abbreviation: "GODM",[\s\S]*?\n\t\}/);
+
+	assert.notEqual(godmakerCard, null, 'the legacy work surface should retain a Godmaker card');
+	assert.match(godmakerCard[0], /title: "Godmaker: Patrons & Prophets"/);
+	assert.doesNotMatch(godmakerCard[0], /releaseYear:/);
+});
+
 test('adds the other approved current BigfootDS project cards', async () => {
   const entries = [
     ['bigfootdsstreamdockicons.md', 'BigfootDS Stream Dock Icons'],

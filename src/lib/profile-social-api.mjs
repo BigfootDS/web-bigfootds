@@ -148,6 +148,39 @@ export async function readPublicProfileResponse(response) {
   }
 }
 
+/**
+ * Selects the editable portion of an owner's MS-Accounts response.
+ *
+ * Owner responses contain internal persistence fields, so this intentionally
+ * returns only fields the profile editor is permitted to display or submit.
+ */
+export function readEditableProfile(value) {
+  if (!isRecord(value)) throw new ProfileSocialApiError('invalid-response');
+
+  return {
+    biography: readOptionalBoundedString(value.biography, 190),
+    displayName: readDisplayName(value.displayName),
+    nameplate: readOptionalBoundedString(value.nameplate, 128),
+    profilePictureBackgroundUrl: readOptionalHttpsUrl(value.profilePictureBackgroundUrl),
+    profilePictureForegroundUrl: readOptionalHttpsUrl(value.profilePictureForegroundUrl),
+    socialLinks: readEditableSocialLinks(value.socialLinks),
+    tag: readOptionalTag(value.tag)
+  };
+}
+
+/** Maps an owner profile response to safe editor data and safe HTTP categories. */
+export async function readEditableProfileResponse(response) {
+  if (response.status === 404) throw new ProfileSocialApiError('not-found');
+  if (!response.ok) throw new ProfileSocialApiError(response.status >= 500 ? 'unavailable' : 'rejected');
+
+  try {
+    return readEditableProfile(await response.json());
+  } catch (error) {
+    if (error instanceof ProfileSocialApiError) throw error;
+    throw new ProfileSocialApiError('invalid-response');
+  }
+}
+
 function readSession(value) {
   if (!isRecord(value)) throw new ProfileSocialApiError('validation');
   return { accessToken: readToken(value.accessToken), refreshToken: readToken(value.refreshToken) };
@@ -172,9 +205,18 @@ function readBoundedString(value, maximumLength) {
   return value;
 }
 
+function readOptionalBoundedString(value, maximumLength) {
+  if (value === undefined) return '';
+  return readBoundedString(value, maximumLength);
+}
+
 function readTag(value) {
   if (typeof value !== 'string' || !/^[a-z0-9]{0,4}$/.test(value)) throw new ProfileSocialApiError('invalid-response');
   return value;
+}
+
+function readOptionalTag(value) {
+  return value === undefined ? '' : readTag(value);
 }
 
 function readPublicSocialLinks(value) {
@@ -201,6 +243,36 @@ function readPublicSocialLinks(value) {
   }).sort((first, second) => first.sortOrder - second.sortOrder);
 }
 
+function readEditableSocialLinks(value) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 8) throw new ProfileSocialApiError('invalid-response');
+  const sortOrders = new Set();
+  const urls = new Set();
+
+  return value.map((link) => {
+    if (!isRecord(link)) throw new ProfileSocialApiError('invalid-response');
+    if (
+      typeof link.sortOrder !== 'number' || !Number.isSafeInteger(link.sortOrder)
+      || link.sortOrder < 0 || link.sortOrder > 99 || sortOrders.has(link.sortOrder)
+      || typeof link.type !== 'string' || !publicSocialLinkTypes.has(link.type)
+      || typeof link.url !== 'string' || !isSafeHttpsUrl(link.url) || urls.has(link.url)
+      || (link.label !== undefined && (typeof link.label !== 'string' || link.label.length === 0 || link.label.length > 48))
+      || (link.visibility !== 'public' && link.visibility !== 'private')
+    ) {
+      throw new ProfileSocialApiError('invalid-response');
+    }
+    sortOrders.add(link.sortOrder);
+    urls.add(link.url);
+    return {
+      ...(link.label === undefined ? {} : { label: link.label }),
+      sortOrder: link.sortOrder,
+      type: link.type,
+      url: link.url,
+      visibility: link.visibility
+    };
+  }).sort((first, second) => first.sortOrder - second.sortOrder);
+}
+
 function isSafeHttpsUrl(value) {
   try {
     const url = new URL(value);
@@ -208,6 +280,12 @@ function isSafeHttpsUrl(value) {
   } catch {
     return false;
   }
+}
+
+function readOptionalHttpsUrl(value) {
+  if (value === undefined) return '';
+  if (typeof value !== 'string' || !isSafeHttpsUrl(value)) throw new ProfileSocialApiError('invalid-response');
+  return value;
 }
 
 function isTimestampOrNull(value) {

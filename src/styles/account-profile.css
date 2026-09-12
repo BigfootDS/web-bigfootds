@@ -1,0 +1,25 @@
+.account-profile {
+	max-width: 48rem;
+	margin: 0 auto;
+}
+
+.account-profile form {
+	display: grid;
+	gap: 0.5rem;
+}
+
+.account-profile input,
+.account-profile textarea,
+.account-profile button {
+	font: inherit;
+}
+
+.account-profile input,
+.account-profile button {
+	min-height: 2.5rem;
+}
+
+.account-profile button {
+	width: fit-content;
+	margin-top: 0.75rem;
+}

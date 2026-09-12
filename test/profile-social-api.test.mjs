@@ -5,6 +5,7 @@ import {
   ProfileSocialApiError,
   createMsAccountsRequest,
   createPublicProfileRequest,
+  readEditableProfile,
   readPublicProfile,
   readPublicProfileResponse,
   readPublicProfileServiceBaseUrl
@@ -62,6 +63,25 @@ test('accepts only the public-safe profile response shape', async () => {
   });
   await assert.rejects(readPublicProfileResponse(new Response('not found', { status: 404 })), isNotFoundError);
   assert.throws(() => readPublicProfile({ ...profile, authUserId: 'private' }), isInvalidResponseError);
+});
+
+test('selects only editable owner profile fields and preserves private link visibility', () => {
+  assert.deepEqual(readEditableProfile({
+    _id: 'internal-profile-id',
+    authUserId: 'internal-auth-user-id',
+    biography: 'BigfootDS tinkerer.',
+    displayName: 'Alex',
+    displayNameNormalised: 'alex',
+    socialLinks: [{ sortOrder: 1, type: 'github', url: 'https://github.com/BigfootDS', visibility: 'private' }]
+  }), {
+    biography: 'BigfootDS tinkerer.',
+    displayName: 'Alex',
+    nameplate: '',
+    profilePictureBackgroundUrl: '',
+    profilePictureForegroundUrl: '',
+    socialLinks: [{ sortOrder: 1, type: 'github', url: 'https://github.com/BigfootDS', visibility: 'private' }],
+    tag: ''
+  });
 });
 
 function isConfigurationError(error) {

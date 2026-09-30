@@ -8,6 +8,7 @@ import {
   createEditorialMediaCompleteRequest,
   createEditorialMediaPreviewRequest,
   createEditorialMediaUploadIntentRequest,
+  createEditorialNewsHistoricalPublicationInput,
   createEditorialNewsPostInput,
   createEditorialNewsPostRequest,
   createEditorialNewsScheduleInput,
@@ -210,6 +211,21 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
     } catch (error) {
       setStatus(error instanceof EditorialNewsApiError && error.kind === 'validation'
         ? 'Enter a future publishing time and, if needed, a later unpublish time.'
+        : statusForError(error));
+    }
+  }
+
+  async function publishHistorically(event) {
+    event.preventDefault();
+    try {
+      const form = new FormData(event.currentTarget);
+      const body = createEditorialNewsHistoricalPublicationInput({
+        publishedOn: String(form.get('publishedOn') ?? '')
+      });
+      await runLifecycleAction('schedule', body, 'News was published with its historical date.');
+    } catch (error) {
+      setStatus(error instanceof EditorialNewsApiError && error.kind === 'validation'
+        ? 'Enter the original publication date as a valid calendar date.'
         : statusForError(error));
     }
   }
@@ -446,7 +462,7 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
         </details>}
 
         {!locked && !isStandaloneLocalDemo && <button className="staff-news__primary-action" type="button" onClick={() => void saveDraft()}>{localDemo ? 'Save local demo draft' : 'Save draft'}</button>}
-        {draft.id && !localDemo && <PublicationControls draft={draft} locked={locked} onPublish={() => void publishNow()} onSchedule={schedule} onUnpublish={() => void unpublish()} />}
+        {draft.id && !localDemo && <PublicationControls draft={draft} locked={locked} onPublish={() => void publishNow()} onPublishHistorically={publishHistorically} onSchedule={schedule} onUnpublish={() => void unpublish()} />}
       </div>
     </section>
   );
@@ -568,7 +584,7 @@ export function StaffNewsRichEditor({ assets = [], disabled, document, onChange,
   );
 }
 
-function PublicationControls({ draft, locked, onPublish, onSchedule, onUnpublish }) {
+function PublicationControls({ draft, locked, onPublish, onPublishHistorically, onSchedule, onUnpublish }) {
   if (draft.status === 'published') {
     return <button type="button" onClick={onUnpublish}>Unpublish News</button>;
   }
@@ -581,6 +597,14 @@ function PublicationControls({ draft, locked, onPublish, onSchedule, onUnpublish
       <label>Unpublish at (optional, your local time)<input name="unpublishAt" type="datetime-local" /></label>
       <button type="submit">Schedule publication</button>
     </form>
+    <details className="staff-news__legacy-publication">
+      <summary>Legacy article migration</summary>
+      <p>Use this only when an existing article has a known original publication date. It makes the article public immediately and preserves that calendar date.</p>
+      <form onSubmit={onPublishHistorically}>
+        <label>Original publication date<input name="publishedOn" type="date" required /></label>
+        <button type="submit">Publish with historical date</button>
+      </form>
+    </details>
   </section>;
 }
 

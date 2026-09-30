@@ -300,9 +300,16 @@ export function createEditorialNewsPostInput(input) {
   };
 }
 
-/** Builds the strict UTC scheduling body; blank end dates deliberately mean no expiry. */
-export function createEditorialNewsScheduleInput({ publishAt, unpublishAt }) {
+/**
+ * Builds the strict future-only UTC scheduling body used by the ordinary
+ * publication form. Historical publication has a separate date-only helper,
+ * so staff cannot accidentally make a legacy post public from this control.
+ */
+export function createEditorialNewsScheduleInput({ now = new Date(), publishAt, unpublishAt }) {
   const publishAtDate = readIsoTimestamp(publishAt);
+  if (!(now instanceof Date) || Number.isNaN(now.getTime()) || Date.parse(publishAtDate) <= now.getTime()) {
+    throw new EditorialNewsApiError('validation');
+  }
   const end = unpublishAt === '' || unpublishAt === undefined || unpublishAt === null
     ? null
     : readIsoTimestamp(unpublishAt);
@@ -310,6 +317,40 @@ export function createEditorialNewsScheduleInput({ publishAt, unpublishAt }) {
     throw new EditorialNewsApiError('validation');
   }
   return { publishAt: publishAtDate, unpublishAt: end };
+}
+
+/**
+ * Builds the fixed UTC schedule used when a legacy article records only a
+ * calendar publication date. Midday UTC keeps the date stable in the static
+ * site's UTC build output without borrowing the current editor's time zone.
+ *
+ * This body intentionally uses the normal staff schedule route. MS-News
+ * treats a past publication time as immediately visible, while ordinary
+ * publishing and future scheduling keep their existing controls.
+ *
+ * @param {{ now?: Date, publishedOn: string }} input Exact source calendar date in `YYYY-MM-DD` form.
+ * @returns {{ publishAt: string, unpublishAt: null }} Strict MS-News publication window.
+ */
+export function createEditorialNewsHistoricalPublicationInput({ now = new Date(), publishedOn }) {
+  if (typeof publishedOn !== 'string') throw new EditorialNewsApiError('validation');
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(publishedOn);
+  if (match === null) throw new EditorialNewsApiError('validation');
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const timestamp = new Date(Date.UTC(year, month - 1, day, 12));
+  if (
+    timestamp.getUTCFullYear() !== year
+    || timestamp.getUTCMonth() !== month - 1
+    || timestamp.getUTCDate() !== day
+    || !(now instanceof Date)
+    || Number.isNaN(now.getTime())
+    || timestamp.getTime() > now.getTime()
+  ) {
+    throw new EditorialNewsApiError('validation');
+  }
+  return { publishAt: timestamp.toISOString(), unpublishAt: null };
 }
 
 /** Parses the server-issued one-image Cloud Storage form capability. */

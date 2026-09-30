@@ -124,6 +124,21 @@
 	gap: 0.75rem;
 }
 
+.staff-news__legacy-publication {
+	margin-top: 1rem;
+	padding-top: 1rem;
+	border-top: 1px solid var(--theme-700);
+}
+
+.staff-news__legacy-publication summary {
+	cursor: pointer;
+	font-weight: 700;
+}
+
+.staff-news__legacy-publication p {
+	max-width: 48rem;
+}
+
 .staff-news__media-list img {
 	display: block;
 	width: 100%;

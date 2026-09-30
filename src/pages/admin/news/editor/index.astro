@@ -9,8 +9,14 @@ import StaffNewsComposer from '../../../../components/StaffNewsComposer.jsx';
 		<BaseHead title="News editor" description="Staff-only BigfootDS News editor." />
 	</head>
 	<body>
-		<main>
+		<main class="staff-news-page">
 			<StaffNewsComposer client:load apiBaseUrl={import.meta.env.PUBLIC_MS_NEWS_BASE_URL} authBaseUrl={import.meta.env.PUBLIC_MS_AUTH_BASE_URL} />
 		</main>
 	</body>
 </html>
+
+<style is:global>
+	main.staff-news-page {
+		width: min(78rem, calc(100% - 2em));
+	}
+</style>

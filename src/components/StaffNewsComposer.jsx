@@ -19,6 +19,8 @@ import {
 } from '../lib/editorial-news-api.mjs';
 import { createRichNewsDocumentFromTiptap, createTiptapNewsDocument } from '../lib/news-editor-document.mjs';
 import { NewsImage, NewsImageGallery, NewsYoutube } from '../lib/news-editor-extensions.mjs';
+import { createLocalNewsEditorDemo, createLocalNewsEditorDemoAssets, isLocalNewsEditorDemo } from '../lib/news-editor-local-demo.mjs';
+import { StaffNewsDocumentPreview } from './StaffNewsDocumentPreview.jsx';
 import '../styles/staff-news.css';
 
 const emptyEditorDocument = { content: [{ type: 'paragraph' }], type: 'doc' };
@@ -39,6 +41,8 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
   const [assets, setAssets] = useState([]);
   const [selectedAssets, setSelectedAssets] = useState([]);
   const [galleryLayout, setGalleryLayout] = useState('carousel');
+  const [isLocalDemo, setIsLocalDemo] = useState(false);
+  const [isStandaloneLocalDemo, setIsStandaloneLocalDemo] = useState(false);
   const editorRef = useRef(null);
   const previewUrls = useRef(new Set());
 
@@ -59,11 +63,24 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
     const parameters = new URLSearchParams(window.location.search);
     const id = parameters.get('id');
     const locale = parameters.get('locale') ?? 'en-AU';
+    if (isLocalEditorDevelopment() && parameters.get('demo') === 'local') {
+      setDraft(createLocalNewsEditorDemo(locale));
+      setAssets(createLocalNewsEditorDemoAssets());
+      setSelectedLocale(locale);
+      setSelectedAssets([]);
+      setIsLocalDemo(true);
+      setIsStandaloneLocalDemo(true);
+      setPhase('ready');
+      setStatus('Local-only content demonstration loaded. It does not contact MS-Auth, MS-News, MongoDB, or a production service.');
+      return;
+    }
     try {
       const session = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
       if (!session) throw new EditorialNewsApiError('rejected');
       if (id === null) {
         setDraft(createEmptyDraft(locale));
+        setIsLocalDemo(false);
+        setIsStandaloneLocalDemo(false);
         setSelectedLocale(locale);
         setPhase('ready');
         setStatus('Create a draft. A rich article needs a title, summary, and content before it can be saved.');
@@ -78,6 +95,8 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
       const post = await readEditorialNewsPostResponse(response);
       const normalisedDraft = createEditableDraft(post);
       setDraft(normalisedDraft);
+      setIsLocalDemo(false);
+      setIsStandaloneLocalDemo(false);
       setSelectedLocale(normalisedDraft.content.some((entry) => entry.locale === locale) ? locale : normalisedDraft.content[0].locale);
       setPhase('ready');
       setStatus(post.status === 'published'
@@ -196,6 +215,10 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
   }
 
   async function runLifecycleAction(operation, body, success) {
+    if (isLocalDemo || isLocalNewsEditorDemo(draft)) {
+      setStatus('This local content demonstration is deliberately protected from publication. Create a normal News record for a real release.');
+      return;
+    }
     if (draft.id === undefined) {
       setStatus('Save this draft before changing its publication state.');
       return;
@@ -339,21 +362,24 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
 
   const content = draft.content.find((entry) => entry.locale === selectedLocale);
   const locked = draft.status === 'published' || draft.status === 'archived';
+  const localDemo = isLocalDemo || isLocalNewsEditorDemo(draft);
   return (
     <section className="staff-news" aria-labelledby="staff-news-composer-heading">
       <p><a href="/admin/news/">← News administration</a></p>
-      <h1 id="staff-news-composer-heading">{draft.id ? 'Edit News record' : 'New News draft'}</h1>
-      <p aria-live="polite">{status}</p>
+      <header className="staff-news__composer-header">
+        <h1 id="staff-news-composer-heading">{draft.id ? 'Edit News record' : 'New News draft'}</h1>
+        <p aria-live="polite">{status}</p>
+        {localDemo && <p className="staff-news__local-demo-notice"><strong>DO NOT PUBLISH:</strong> this is a local content demonstration. Its fixture media references are for editor preview only.{isStandaloneLocalDemo ? ' This development URL does not contact any service or database.' : ''}</p>}
+      </header>
 
-      <div className="staff-news__editor-grid">
-        <div>
+      <div className="staff-news__workspace">
+        <details className="staff-news__settings" open>
+          <summary>Article settings</summary>
           <fieldset className="staff-news__fieldset" disabled={locked}>
-            <legend>Record metadata</legend>
             <label>Project ID<input value={draft.projectId} onChange={(event) => updateDraft({ projectId: event.target.value })} required /></label>
             <label>Category<input value={draft.category} onChange={(event) => updateDraft({ category: event.target.value })} required /></label>
             <label>Tags (space or comma separated)<input value={draft.tags} onChange={(event) => updateDraft({ tags: event.target.value })} /></label>
           </fieldset>
-
           <div className="staff-news__locale-row">
             <label>Editing locale<select value={selectedLocale} onChange={(event) => setSelectedLocale(event.target.value)}>{draft.content.map((entry) => <option key={entry.locale} value={entry.locale}>{entry.locale}</option>)}</select></label>
             {draft.content.length > 1 && <button type="button" onClick={removeSelectedLocale} disabled={locked}>Remove locale</button>}
@@ -362,28 +388,25 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
             <label>Add locale<input name="locale" placeholder="ja-JP" disabled={locked} /></label>
             <button type="submit" disabled={locked}>Add translation</button>
           </form>
+        </details>
 
-          <fieldset className="staff-news__fieldset" disabled={locked}>
-            <legend>Localised content</legend>
-            <label>Title<input value={content.title} onChange={(event) => updateSelectedContent({ title: event.target.value })} maxLength="200" required /></label>
-            <label>Summary<textarea value={content.summary} onChange={(event) => updateSelectedContent({ summary: event.target.value })} maxLength="600" rows="3" required /></label>
-            <label>Article</label>
-            <StaffNewsRichEditor
-              key={`${draft.id ?? 'new'}-${selectedLocale}`}
-              disabled={locked}
-              document={content.document}
-              onChange={(document) => updateSelectedContent({ document })}
-              onReady={(editor) => { editorRef.current = editor; }}
-            />
-          </fieldset>
+        <fieldset className="staff-news__content" disabled={locked}>
+          <legend>Article content</legend>
+          <label>Title<input value={content.title} onChange={(event) => updateSelectedContent({ title: event.target.value })} maxLength="200" required /></label>
+          <label>Summary<textarea value={content.summary} onChange={(event) => updateSelectedContent({ summary: event.target.value })} maxLength="600" rows="3" required /></label>
+          <StaffNewsRichEditor
+            assets={assets}
+            key={`${draft.id ?? 'new'}-${selectedLocale}`}
+            disabled={locked}
+            document={content.document}
+            onChange={(document) => updateSelectedContent({ document })}
+            onReady={(editor) => { editorRef.current = editor; }}
+          />
+        </fieldset>
 
-          {!locked && <button className="staff-news__primary-action" type="button" onClick={() => void saveDraft()}>Save draft</button>}
-          {draft.id && <PublicationControls draft={draft} locked={locked} onPublish={() => void publishNow()} onSchedule={schedule} onUnpublish={() => void unpublish()} />}
-        </div>
-
-        {!locked && <aside className="staff-news__media" aria-labelledby="staff-news-media-heading">
-          <h2 id="staff-news-media-heading">Verified media</h2>
-          <p>Uploads go directly to a one-image Cloud Storage form capability. The article stores only the opaque media ID.</p>
+        {!locked && <details className="staff-news__media" open>
+          <summary>Media and embeds</summary>
+          <p>Uploads use a one-image Cloud Storage capability. The article stores only a verified opaque media ID.</p>
           <form onSubmit={uploadImage}>
             <label>Image file<input name="image" accept="image/jpeg,image/png,image/webp" type="file" required /></label>
             <label>Alt text<input name="alt" maxLength="300" required /></label>
@@ -420,7 +443,10 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
             <label>Start time in seconds (optional)<input name="startAt" inputMode="numeric" /></label>
             <button type="submit">Insert YouTube video</button>
           </form>
-        </aside>}
+        </details>}
+
+        {!locked && !isStandaloneLocalDemo && <button className="staff-news__primary-action" type="button" onClick={() => void saveDraft()}>{localDemo ? 'Save local demo draft' : 'Save draft'}</button>}
+        {draft.id && !localDemo && <PublicationControls draft={draft} locked={locked} onPublish={() => void publishNow()} onSchedule={schedule} onUnpublish={() => void unpublish()} />}
       </div>
     </section>
   );
@@ -431,7 +457,10 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
  * existing editor instance. Tiptap does not update `editable` from later hook
  * options, so publication transitions require the explicit effect below.
  */
-export function StaffNewsRichEditor({ disabled, document, onChange, onReady }) {
+export function StaffNewsRichEditor({ assets = [], disabled, document, onChange, onReady }) {
+  const [mode, setMode] = useState('write');
+  const [linkEditor, setLinkEditor] = useState(undefined);
+  const [previewDocument, setPreviewDocument] = useState(document);
   const editor = useEditor({
     content: document,
     editable: !disabled,
@@ -442,7 +471,11 @@ export function StaffNewsRichEditor({ disabled, document, onChange, onReady }) {
       NewsYoutube
     ],
     immediatelyRender: false,
-    onUpdate: ({ editor: nextEditor }) => onChange(nextEditor.getJSON())
+    onUpdate: ({ editor: nextEditor }) => {
+      const nextDocument = nextEditor.getJSON();
+      setPreviewDocument(nextDocument);
+      onChange(nextDocument);
+    }
   });
 
   useEffect(() => {
@@ -454,20 +487,83 @@ export function StaffNewsRichEditor({ disabled, document, onChange, onReady }) {
     editor?.setEditable(!disabled);
   }, [disabled, editor]);
 
+  function chooseTextStyle(event) {
+    const value = event.target.value;
+    const chain = editor.chain().focus();
+    if (value === 'paragraph') chain.setParagraph().run();
+    else chain.toggleHeading({ level: Number(value) }).run();
+  }
+
+  function openLinkEditor() {
+    setLinkEditor({ error: '', href: editor.getAttributes('link').href ?? '' });
+  }
+
+  function saveLink(event) {
+    event.preventDefault();
+    const href = linkEditor.href.trim();
+    if (!isApprovedEditorLink(href)) {
+      setLinkEditor((current) => ({ ...current, error: 'Use an HTTP(S), mailto, or site-relative link.' }));
+      return;
+    }
+    editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
+    setLinkEditor(undefined);
+  }
+
+  function removeLink() {
+    editor.chain().focus().extendMarkRange('link').unsetLink().run();
+    setLinkEditor(undefined);
+  }
+
   if (!editor) return <p>Loading the editor…</p>;
   return (
     <div className="staff-news-editor">
-      <div className="staff-news-editor__toolbar" aria-label="Article formatting">
-        <button type="button" disabled={disabled} onClick={() => editor.chain().focus().toggleBold().run()} aria-pressed={editor.isActive('bold')}>Bold</button>
-        <button type="button" disabled={disabled} onClick={() => editor.chain().focus().toggleItalic().run()} aria-pressed={editor.isActive('italic')}>Italic</button>
-        <button type="button" disabled={disabled} onClick={() => editor.chain().focus().toggleStrike().run()} aria-pressed={editor.isActive('strike')}>Strike</button>
-        <button type="button" disabled={disabled} onClick={() => editor.chain().focus().toggleBulletList().run()} aria-pressed={editor.isActive('bulletList')}>Bullets</button>
-        <button type="button" disabled={disabled} onClick={() => editor.chain().focus().toggleOrderedList().run()} aria-pressed={editor.isActive('orderedList')}>Numbered list</button>
-        <button type="button" disabled={disabled} onClick={() => editor.chain().focus().toggleBlockquote().run()} aria-pressed={editor.isActive('blockquote')}>Quote</button>
-        <button type="button" disabled={disabled} onClick={() => editor.chain().focus().setHorizontalRule().run()}>Rule</button>
-        <button type="button" disabled={disabled} onClick={() => setLink(editor)}>Link</button>
+      <div className="staff-news-editor__mode-tabs" role="tablist" aria-label="Article view">
+        <button aria-selected={mode === 'write'} onClick={() => setMode('write')} role="tab" type="button">Write</button>
+        <button aria-selected={mode === 'preview'} onClick={() => setMode('preview')} role="tab" type="button">Preview</button>
       </div>
-      <EditorContent editor={editor} />
+      {mode === 'write' && <>
+        <div className="staff-news-editor__toolbar" aria-label="Article formatting" role="toolbar">
+          <div aria-label="History" className="staff-news-editor__toolbar-group" role="group">
+            <button disabled={disabled || !editor.can().undo()} onClick={() => editor.chain().focus().undo().run()} type="button">Undo</button>
+            <button disabled={disabled || !editor.can().redo()} onClick={() => editor.chain().focus().redo().run()} type="button">Redo</button>
+          </div>
+          <div aria-label="Text style" className="staff-news-editor__toolbar-group" role="group">
+            <label>Text style
+              <select disabled={disabled} onChange={chooseTextStyle} value={editor.isActive('heading', { level: 2 }) ? '2' : editor.isActive('heading', { level: 3 }) ? '3' : editor.isActive('heading', { level: 4 }) ? '4' : 'paragraph'}>
+                <option value="paragraph">Paragraph</option>
+                <option value="2">Heading 2</option>
+                <option value="3">Heading 3</option>
+                <option value="4">Heading 4</option>
+              </select>
+            </label>
+          </div>
+          <div aria-label="Text formatting" className="staff-news-editor__toolbar-group" role="group">
+            <button aria-pressed={editor.isActive('bold')} disabled={disabled} onClick={() => editor.chain().focus().toggleBold().run()} type="button">Bold</button>
+            <button aria-pressed={editor.isActive('italic')} disabled={disabled} onClick={() => editor.chain().focus().toggleItalic().run()} type="button">Italic</button>
+            <button aria-pressed={editor.isActive('strike')} disabled={disabled} onClick={() => editor.chain().focus().toggleStrike().run()} type="button">Strike</button>
+            <button aria-pressed={editor.isActive('code')} disabled={disabled} onClick={() => editor.chain().focus().toggleCode().run()} type="button">Code</button>
+          </div>
+          <div aria-label="Blocks" className="staff-news-editor__toolbar-group" role="group">
+            <button aria-pressed={editor.isActive('bulletList')} disabled={disabled} onClick={() => editor.chain().focus().toggleBulletList().run()} type="button">Bullets</button>
+            <button aria-pressed={editor.isActive('orderedList')} disabled={disabled} onClick={() => editor.chain().focus().toggleOrderedList().run()} type="button">Numbered list</button>
+            <button aria-pressed={editor.isActive('blockquote')} disabled={disabled} onClick={() => editor.chain().focus().toggleBlockquote().run()} type="button">Quote</button>
+            <button disabled={disabled} onClick={() => editor.chain().focus().setHorizontalRule().run()} type="button">Divider</button>
+          </div>
+          <div aria-label="Links" className="staff-news-editor__toolbar-group" role="group">
+            <button aria-pressed={editor.isActive('link')} disabled={disabled} onClick={openLinkEditor} type="button">Link</button>
+            <button disabled={disabled || !editor.isActive('link')} onClick={removeLink} type="button">Remove link</button>
+          </div>
+        </div>
+        {linkEditor !== undefined && <form className="staff-news-editor__link-editor" onSubmit={saveLink}>
+          <label>Link destination<input autoFocus onChange={(event) => setLinkEditor((current) => ({ ...current, href: event.target.value }))} placeholder="https://example.com or /projects/" type="text" value={linkEditor.href} /></label>
+          {linkEditor.error && <p role="alert">{linkEditor.error}</p>}
+          <button type="submit">Save link</button>
+          <button onClick={removeLink} type="button">Remove link</button>
+          <button onClick={() => setLinkEditor(undefined)} type="button">Cancel</button>
+        </form>}
+        <EditorContent editor={editor} />
+      </>}
+      {mode === 'preview' && <StaffNewsDocumentPreview assets={assets} document={previewDocument} />}
     </div>
   );
 }
@@ -556,10 +652,26 @@ function readOptionalLocalTime(value) {
   return value === '' ? '' : localTimeToIso(value);
 }
 
-function setLink(editor) {
-  const href = window.prompt('Enter an HTTP(S) or mailto link.');
-  if (!href) return;
-  editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
+function isApprovedEditorLink(value) {
+  try {
+    const url = new URL(value, 'https://bigfootds.com');
+    return url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'mailto:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Allows the browser-only content fixture only in a Vite development server.
+ * Vitest uses the `test` mode rather than setting `DEV`, so it is included to
+ * exercise the same no-network path in component tests; neither mode is part
+ * of a production client build.
+ *
+ * @returns {boolean} Whether the current browser is a supported local development host.
+ */
+function isLocalEditorDevelopment() {
+  const isDevelopmentMode = import.meta.env.DEV || import.meta.env.MODE === 'test';
+  return isDevelopmentMode && ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
 }
 
 function statusForError(error) {

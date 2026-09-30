@@ -226,7 +226,8 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
 
   async function uploadImage(event) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const uploadForm = event.currentTarget;
+    const form = new FormData(uploadForm);
     const file = form.get('image');
     const alt = String(form.get('alt') ?? '').trim();
     const caption = String(form.get('caption') ?? '').trim();
@@ -251,17 +252,30 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
         session
       }));
       const completed = await readEditorialMediaCompletionResponse(completionResponse);
-      const previewResponse = await requestWithCurrentSession((session) => createEditorialMediaPreviewRequest({
-        apiBaseUrl,
-        assetId: completed.assetId,
-        session
-      }));
-      const previewUrl = await readEditorialMediaPreviewResponse({ response: previewResponse });
-      previewUrls.current.add(previewUrl);
-      const asset = { ...completed, alt, ...(caption === '' ? {} : { caption }), previewUrl };
+      let previewUrl;
+      try {
+        const previewResponse = await requestWithCurrentSession((session) => createEditorialMediaPreviewRequest({
+          apiBaseUrl,
+          assetId: completed.assetId,
+          session
+        }));
+        previewUrl = await readEditorialMediaPreviewResponse({ response: previewResponse });
+        previewUrls.current.add(previewUrl);
+      } catch {
+        // Preview transport is an editor aid only. Completion already proved the
+        // opaque asset is valid and ready for document insertion.
+      }
+      const asset = {
+        ...completed,
+        alt,
+        ...(caption === '' ? {} : { caption }),
+        ...(previewUrl === undefined ? {} : { previewUrl })
+      };
       setAssets((current) => [...current, asset]);
-      setStatus('Image verified. Insert it into the article or select it with another image for a gallery.');
-      event.currentTarget.reset();
+      setStatus(previewUrl === undefined
+        ? 'Image verified. Its temporary preview could not be loaded, but it can still be inserted into the article or selected for a gallery.'
+        : 'Image verified. Insert it into the article or select it with another image for a gallery.');
+      uploadForm.reset();
     } catch (error) {
       setStatus(error instanceof EditorialNewsApiError && error.kind === 'validation'
         ? 'Use a JPEG, PNG, or WebP image no larger than 10 MiB.'
@@ -379,7 +393,9 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
           {assets.length > 0 && <>
             <ul className="staff-news__media-list">
               {assets.map((asset) => <li key={asset.assetId}>
-                <img alt={asset.alt} src={asset.previewUrl} />
+                {asset.previewUrl === undefined
+                  ? <p className="staff-news__media-preview-unavailable">Temporary image preview unavailable.</p>
+                  : <img alt={asset.alt} src={asset.previewUrl} />}
                 <p>{asset.alt}</p>
                 <button type="button" onClick={() => insertImage(asset)}>Insert image</button>
                 <label><input checked={selectedAssets.includes(asset.assetId)} onChange={() => toggleGalleryAsset(asset.assetId)} type="checkbox" /> Include in gallery</label>

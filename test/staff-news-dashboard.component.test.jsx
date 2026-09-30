@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import StaffNewsComposer, { StaffNewsRichEditor } from '../src/components/StaffNewsComposer.jsx';
@@ -90,6 +90,81 @@ test('updates the existing Tiptap instance when publication changes editability'
   await waitFor(() => expect(container.querySelector('.tiptap')?.getAttribute('contenteditable')).toBe('true'));
 });
 
+test('keeps a verified image available for insertion when only its temporary preview fails', async () => {
+  const postId = '0123456789abcdef01234567';
+  const assetId = 'nma_0123456789abcdef0123456789abcdef';
+  window.history.replaceState({}, '', `/admin/news/editor/?id=${postId}&locale=en-AU`);
+  window.localStorage.setItem(BROWSER_AUTH_SESSION_STORAGE_KEY, JSON.stringify({
+    accessToken: 'access.initial',
+    refreshToken: 'refresh.current'
+  }));
+  const image = new File([new Uint8Array(42)], 'website.png', { type: 'image/png' });
+  vi.stubGlobal('FormData', class {
+    constructor(form) {
+      this.form = form;
+      this.entries = [];
+    }
+
+    append(name, value) {
+      this.entries.push([name, value]);
+    }
+
+    get(name) {
+      if (!this.form) return null;
+      if (name === 'image') return image;
+      if (name === 'alt') return 'Website overhaul preview';
+      return '';
+    }
+  });
+  vi.stubGlobal('fetch', vi.fn(async (input) => {
+    const url = new URL(input);
+    if (url.origin === authBaseUrl) return json({ accessToken: 'access.renewed', refreshToken: 'refresh.current' });
+    if (url.pathname.endsWith(`/news/${postId}`)) return json({ result: draftPost(postId) });
+    if (url.pathname.endsWith('/upload-intents')) return json({
+      result: {
+        assetId,
+        expiresAt: '2030-09-12T03:10:00.000Z',
+        upload: { formFields: { key: 'news-media/staging/opaque' }, method: 'POST', url: 'https://storage.example.test/upload' }
+      }
+    });
+    if (url.origin === 'https://storage.example.test') return new Response(null, { status: 204 });
+    if (url.pathname.endsWith(`/${assetId}/complete`)) return json({
+      result: { assetId, byteLength: 42, contentType: 'image/png', dimensions: { height: 180, width: 320 }, status: 'ready' }
+    });
+    if (url.pathname.endsWith(`/${assetId}/preview`)) throw new Error('private preview transport failure');
+    throw new Error(`Unexpected request ${url}`);
+  }));
+
+  render(<StaffNewsComposer apiBaseUrl={newsBaseUrl} authBaseUrl={authBaseUrl} />);
+
+  await screen.findByRole('heading', { name: 'Edit News record' });
+  fireEvent.submit(screen.getByRole('button', { name: 'Upload and verify image' }).closest('form'));
+
+  await screen.findByText('Image verified. Its temporary preview could not be loaded, but it can still be inserted into the article or selected for a gallery.');
+  expect(screen.getByText('Temporary image preview unavailable.')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Insert image' })).toBeTruthy();
+  expect(screen.queryByText('private preview transport failure')).toBeNull();
+});
+
 function json(value) {
   return new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json' } });
+}
+
+function draftPost(id) {
+  return {
+    category: 'announcement',
+    content: [{
+      body: 'Safe staff content.',
+      locale: 'en-AU',
+      summary: 'Safe staff summary.',
+      title: 'Safe staff title'
+    }],
+    id,
+    projectId: 'website',
+    publishAt: '2026-09-12T03:00:00.000Z',
+    status: 'draft',
+    tags: ['release'],
+    unpublishAt: null,
+    updatedAt: '2026-09-12T03:00:00.000Z'
+  };
 }

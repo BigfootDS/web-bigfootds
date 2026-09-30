@@ -137,6 +137,8 @@ Browser editorial requests use `Authorization: Bearer <access token>`, `accessTo
 
 An image upload has three steps: the staff browser requests one MS-News upload intent, posts the image form directly to the private bucket, then asks MS-News to inspect and finalise it. Only a JPEG, PNG, or WebP image up to 10 MiB can reach that flow. After verification, the browser tries to fetch the attested staff preview route and retains its returned blob URL in memory. That preview is an editor convenience, not part of the media contract: if it cannot load, the verified opaque asset can still be inserted into the article or added to a gallery. The public website uses the separate visibility-gated MS-News media route after a post is published.
 
+For a one-off migration of an existing article, the staff editor also has a separate **Legacy article migration** control. It accepts an original past calendar date, sends that date as 12:00 UTC through the existing staff scheduling contract, and publishes the article immediately. This keeps the historical date stable in the static site's UTC build output. It is not a replacement for normal `Publish now` or future scheduling.
+
 Before enabling browser media uploads in a deployed environment, configure the following operational pieces:
 
 1. Create a private Google Cloud Storage bucket with Uniform Bucket-Level Access and Public Access Prevention enabled. Do not grant `allUsers` object access or create a static service-account key.

@@ -193,6 +193,74 @@ test('keeps a verified image available for insertion when only its temporary pre
   expect(screen.queryByText('private preview transport failure')).toBeNull();
 });
 
+test('uses the normal staff schedule route to publish a legacy article at its source date', async () => {
+  const postId = '0123456789abcdef01234567';
+  window.history.replaceState({}, '', `/admin/news/editor/?id=${postId}&locale=en-AU`);
+  window.localStorage.setItem(BROWSER_AUTH_SESSION_STORAGE_KEY, JSON.stringify({
+    accessToken: 'access.initial',
+    refreshToken: 'refresh.current'
+  }));
+  const schedules = [];
+  vi.stubGlobal('fetch', vi.fn(async (input, init) => {
+    const url = new URL(input);
+    if (url.origin === authBaseUrl) return json({ accessToken: 'access.renewed', refreshToken: 'refresh.current' });
+    if (url.pathname.endsWith(`/news/${postId}`)) return json({ result: draftPost(postId) });
+    if (url.pathname.endsWith('/schedule')) {
+      schedules.push(JSON.parse(init.body));
+      return json({ result: { ...draftPost(postId), publishAt: '2024-12-29T12:00:00.000Z', status: 'published' } });
+    }
+    throw new Error(`Unexpected request ${url}`);
+  }));
+
+  render(<StaffNewsComposer apiBaseUrl={newsBaseUrl} authBaseUrl={authBaseUrl} />);
+
+  await screen.findByRole('heading', { name: 'Edit News record' });
+  fireEvent.change(screen.getByLabelText('Original publication date'), { target: { value: '2024-12-29' } });
+  fireEvent.submit(screen.getByRole('button', { name: 'Publish with historical date' }).closest('form'));
+
+  await screen.findByText('News was published with its historical date.');
+  expect(schedules).toEqual([{
+    publishAt: '2024-12-29T12:00:00.000Z',
+    unpublishAt: null
+  }]);
+});
+
+test('keeps ordinary scheduling future-only and reserves historical dates for migration', async () => {
+  const postId = '0123456789abcdef01234567';
+  window.history.replaceState({}, '', `/admin/news/editor/?id=${postId}&locale=en-AU`);
+  window.localStorage.setItem(BROWSER_AUTH_SESSION_STORAGE_KEY, JSON.stringify({
+    accessToken: 'access.initial',
+    refreshToken: 'refresh.current'
+  }));
+  const schedules = [];
+  vi.stubGlobal('fetch', vi.fn(async (input, init) => {
+    const url = new URL(input);
+    if (url.origin === authBaseUrl) return json({ accessToken: 'access.renewed', refreshToken: 'refresh.current' });
+    if (url.pathname.endsWith(`/news/${postId}`)) return json({ result: draftPost(postId) });
+    if (url.pathname.endsWith('/schedule')) {
+      schedules.push(JSON.parse(init.body));
+      return json({ result: { ...draftPost(postId), publishAt: '2030-01-02T12:00:00.000Z', status: 'published' } });
+    }
+    throw new Error(`Unexpected request ${url}`);
+  }));
+
+  render(<StaffNewsComposer apiBaseUrl={newsBaseUrl} authBaseUrl={authBaseUrl} />);
+
+  await screen.findByRole('heading', { name: 'Edit News record' });
+  const publicationForm = screen.getByRole('button', { name: 'Schedule publication' }).closest('form');
+  fireEvent.change(screen.getByLabelText('Publish at (your local time)'), { target: { value: '2024-12-29T12:00' } });
+  fireEvent.submit(publicationForm);
+  await screen.findByText('Enter a future publishing time and, if needed, a later unpublish time.');
+  expect(schedules).toEqual([]);
+
+  fireEvent.change(screen.getByLabelText('Publish at (your local time)'), { target: { value: '2030-01-02T12:00' } });
+  fireEvent.submit(publicationForm);
+  await screen.findByText('News schedule saved.');
+  expect(schedules).toHaveLength(1);
+  expect(new Date(schedules[0].publishAt).getUTCFullYear()).toBe(2030);
+  expect(schedules[0].unpublishAt).toBeNull();
+});
+
 function json(value) {
   return new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json' } });
 }

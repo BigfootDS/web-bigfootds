@@ -6,6 +6,7 @@ import {
   createEditorialMediaUploadIntentRequest,
   createEditorialMediaPreviewRequest,
   createEditorialNewsListRequest,
+  createEditorialNewsHistoricalPublicationInput,
   createEditorialNewsPostInput,
   createEditorialNewsPostRequest,
   createEditorialNewsScheduleInput,
@@ -53,6 +54,7 @@ test('requires a bare public MS-News origin and uses the documented direct-clien
 });
 
 test('serialises only validated editor fields and a strict UTC schedule', () => {
+  const now = new Date('2026-09-11T12:00:00.000Z');
   assert.deepEqual(createEditorialNewsPostInput({
     category: 'announcement',
     contents: [{ document: validDocument(), locale: 'en-AU', summary: 'A safe summary.', title: 'A safe title' }],
@@ -60,6 +62,7 @@ test('serialises only validated editor fields and a strict UTC schedule', () => 
     tags: ['release']
   }), validPostInput());
   assert.deepEqual(createEditorialNewsScheduleInput({
+    now,
     publishAt: '2026-09-12T04:00:00.000Z',
     unpublishAt: ''
   }), {
@@ -67,9 +70,26 @@ test('serialises only validated editor fields and a strict UTC schedule', () => 
     unpublishAt: null
   });
   assert.throws(() => createEditorialNewsScheduleInput({
+    now,
     publishAt: '2026-09-12T04:00:00.000Z',
     unpublishAt: '2026-09-12T03:00:00.000Z'
   }), isValidationError);
+  assert.throws(() => createEditorialNewsScheduleInput({
+    now,
+    publishAt: '2026-09-11T12:00:00.000Z',
+    unpublishAt: ''
+  }), isValidationError);
+});
+
+test('turns a historical calendar date into a stable immediate publication window', () => {
+  const now = new Date('2026-09-30T12:00:00.000Z');
+  assert.deepEqual(createEditorialNewsHistoricalPublicationInput({ now, publishedOn: '2024-12-29' }), {
+    publishAt: '2024-12-29T12:00:00.000Z',
+    unpublishAt: null
+  });
+  assert.throws(() => createEditorialNewsHistoricalPublicationInput({ now, publishedOn: '2024-02-30' }), isValidationError);
+  assert.throws(() => createEditorialNewsHistoricalPublicationInput({ now, publishedOn: '29-12-2024' }), isValidationError);
+  assert.throws(() => createEditorialNewsHistoricalPublicationInput({ now, publishedOn: '2026-10-01' }), isValidationError);
 });
 
 test('accepts staff-safe list and full record shapes, but rejects audit data and unsafe document fields', () => {

@@ -3,7 +3,9 @@ import { expect, test, vi } from 'vitest';
 
 import StaffNewsComposer, { StaffNewsRichEditor } from '../src/components/StaffNewsComposer.jsx';
 import StaffNewsDashboard from '../src/components/StaffNewsDashboard.jsx';
+import { StaffNewsDocumentPreview } from '../src/components/StaffNewsDocumentPreview.jsx';
 import { BROWSER_AUTH_SESSION_STORAGE_KEY } from '../src/lib/browser-auth-session.mjs';
+import { createLocalNewsEditorDemo, createLocalNewsEditorDemoAssets } from '../src/lib/news-editor-local-demo.mjs';
 
 const authBaseUrl = 'https://auth.bigfootds.dev';
 const newsBaseUrl = 'https://news.bigfootds.dev';
@@ -88,6 +90,51 @@ test('updates the existing Tiptap instance when publication changes editability'
   await waitFor(() => expect(container.querySelector('.tiptap')?.getAttribute('contenteditable')).toBe('false'));
   rerender(<StaffNewsRichEditor disabled={false} document={document} onChange={onChange} onReady={onReady} />);
   await waitFor(() => expect(container.querySelector('.tiptap')?.getAttribute('contenteditable')).toBe('true'));
+});
+
+test('uses a familiar grouped toolbar, link form, and same-document preview', async () => {
+  const onChange = vi.fn();
+  const onReady = vi.fn();
+  const document = {
+    content: [{ content: [{ text: 'A previewable paragraph.', type: 'text' }], type: 'paragraph' }],
+    type: 'doc'
+  };
+  render(<StaffNewsRichEditor assets={[]} disabled={false} document={document} onChange={onChange} onReady={onReady} />);
+
+  await screen.findByRole('toolbar', { name: 'Article formatting' });
+  expect(screen.getByRole('group', { name: 'History' })).toBeTruthy();
+  expect(screen.getByRole('combobox', { name: 'Text style' })).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Link' }));
+  expect(screen.getByLabelText('Link destination')).toBeTruthy();
+  fireEvent.click(screen.getByRole('tab', { name: 'Preview' }));
+  expect(screen.getByRole('article', { name: 'Article preview' })).toBeTruthy();
+  expect(screen.getByText('A previewable paragraph.')).toBeTruthy();
+});
+
+test('renders the local demonstration document with preview-only media and a video', () => {
+  const demo = createLocalNewsEditorDemo('en-AU');
+  render(<StaffNewsDocumentPreview assets={createLocalNewsEditorDemoAssets()} document={demo.content[0].document} />);
+
+  expect(screen.getByRole('heading', { name: 'Everything the News editor can display' })).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'clickable BigfootDS repository link' }).getAttribute('href')).toBe('https://github.com/BigfootDS');
+  expect(screen.getAllByRole('img')).toHaveLength(3);
+  expect(screen.getByTitle('Embedded YouTube video preview').getAttribute('src')).toContain('www.youtube-nocookie.com/embed/M7lc1UVf-VE');
+});
+
+test('loads the standalone local demonstration without a staff session or network request', async () => {
+  window.history.replaceState({}, '', '/admin/news/editor/?demo=local&locale=en-AU');
+  window.localStorage.clear();
+  const fetch = vi.fn();
+  vi.stubGlobal('fetch', fetch);
+
+  render(<StaffNewsComposer apiBaseUrl={newsBaseUrl} authBaseUrl={authBaseUrl} />);
+
+  await screen.findByText('Local-only content demonstration loaded. It does not contact MS-Auth, MS-News, MongoDB, or a production service.');
+  expect(screen.getByText(/DO NOT PUBLISH:/)).toBeTruthy();
+  expect(screen.getByDisplayValue('DO NOT PUBLISH: News editor content demo')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Save local demo draft' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Publish now' })).toBeNull();
+  expect(fetch).not.toHaveBeenCalled();
 });
 
 test('keeps a verified image available for insertion when only its temporary preview fails', async () => {

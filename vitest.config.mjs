@@ -5,7 +5,7 @@ export default defineConfig({
     environment: 'jsdom',
     environmentOptions: {
       jsdom: {
-        url: 'https://bigfootds.test/'
+        url: 'http://localhost/'
       }
     },
     include: ['test/**/*.component.test.jsx'],

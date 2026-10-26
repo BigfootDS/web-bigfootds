@@ -35,7 +35,7 @@ export function createRegistrationRequest(input) {
  */
 export function createEmailVerificationRequest(input) {
   const code = typeof input.code === 'string' ? input.code.trim().toLowerCase() : '';
-  if (!/^[a-f0-9]{8}$/.test(code)) throw new AccountOnboardingError('validation');
+  if (!/^[a-f0-9]{32}$/.test(code)) throw new AccountOnboardingError('validation');
   return createRequest(input.apiBaseUrl, '/v1/users/public/emailVerification', { code });
 }
 
@@ -56,6 +56,18 @@ export async function registerWebsiteAccount(input) {
  */
 export async function verifyWebsiteEmail(input) {
   await sendRequest(createEmailVerificationRequest(input), input.fetchImpl);
+}
+
+/**
+ * Requests a replacement without revealing eligibility. Email remains only in
+ * the no-store JSON request; automatic retries must not create manual resends.
+ * @param {{ apiBaseUrl?: string, email: string, fetchImpl?: typeof fetch }} input Registered email and test transport.
+ * @returns {Promise<void>} Resolves on the API's generic acceptance.
+ */
+export async function requestWebsiteVerificationEmail(input) {
+  if (typeof input.email !== 'string' || input.email.length > 320
+    || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)) throw new AccountOnboardingError('validation');
+  await sendRequest(createRequest(input.apiBaseUrl, '/v1/users/public/email-verification-requests', { email: input.email }), input.fetchImpl);
 }
 
 function createRequest(apiBaseUrl, pathname, body) {

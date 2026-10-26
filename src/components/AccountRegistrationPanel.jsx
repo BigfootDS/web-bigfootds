@@ -20,7 +20,7 @@ export default function AccountRegistrationPanel({ apiBaseUrl }) {
     const data = new FormData(form);
     pending.current = true;
     setPhase('pending');
-    setStatus('Creating your account…');
+    setStatus('Submitting your signup…');
     try {
       await registerWebsiteAccount({ apiBaseUrl, email: String(data.get('email') ?? ''),
         password: String(data.get('password') ?? ''), confirmation: String(data.get('confirmation') ?? '') });
@@ -38,8 +38,8 @@ export default function AccountRegistrationPanel({ apiBaseUrl }) {
 
   if (phase === 'complete') return <section>
     <h1>Check your email</h1>
-    <p>Your account was created. Enter the code from the confirmation email to verify your address.</p>
-    <p><a href="/account/verify-email/">Verify your email address</a></p>
+    <p>Check your inbox for verification instructions if signup is eligible. Paste the 32-character code within 24 hours, then sign in. You can request a new code if needed.</p>
+    <p><a href="/account/verify-email/">Enter or request a verification code</a></p>
     <p><a href="/account/">Return to sign in</a></p>
   </section>;
   if (phase === 'unavailable') return <section><h1>Account creation unavailable</h1>

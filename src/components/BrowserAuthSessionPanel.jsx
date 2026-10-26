@@ -149,6 +149,10 @@ function statusForError(error, action) {
     return { message: 'Account sign-in is not available right now. Please try again later.', state: 'unavailable' };
   }
 
+  if (error.kind === 'verification-required') {
+    return { message: 'Verify your email before signing in. Use the verification page to enter or request a new code.', state: 'signed-out' };
+  }
+
   if (error.kind === 'rejected') {
     return action === 'verify'
       ? { message: 'Your previous sign-in has ended. Please sign in again.', state: 'signed-out' }

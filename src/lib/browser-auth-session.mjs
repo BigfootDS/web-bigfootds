@@ -14,7 +14,7 @@ const tokenPattern = /^[A-Za-z0-9._~-]+$/;
  */
 export class BrowserAuthSessionError extends Error {
   /**
-   * @param {'configuration' | 'invalid-response' | 'rejected' | 'storage' | 'unavailable' | 'validation'} kind Safe category for browser presentation.
+   * @param {'configuration' | 'invalid-response' | 'rejected' | 'verification-required' | 'storage' | 'unavailable' | 'validation'} kind Safe category for browser presentation.
    */
   constructor(kind) {
     super('Browser authentication could not be completed.');
@@ -226,7 +226,11 @@ export async function signInBrowserAuthSession(input) {
   const request = createMsAuthLoginRequest(input);
   const response = await sendRequest(input.fetchImpl, request);
 
-  if (!response.ok) throw responseError(response.status);
+  if (!response.ok) {
+    const error = await readResponseError(response);
+    if (error.kind === 'verification-required') clearStoredBrowserAuthSession(input.storage);
+    throw error;
+  }
 
   const session = await readTokenPairResponse(response);
   writeStoredBrowserAuthSession(input.storage, session);
@@ -250,8 +254,8 @@ export async function verifyStoredBrowserAuthSession(input) {
   const response = await sendRequest(input.fetchImpl, request);
 
   if (!response.ok) {
-    const error = responseError(response.status);
-    if (error.kind === 'rejected') clearStoredBrowserAuthSession(input.storage);
+    const error = await readResponseError(response);
+    if (error.kind === 'rejected' || error.kind === 'verification-required') clearStoredBrowserAuthSession(input.storage);
     throw error;
   }
 
@@ -341,6 +345,17 @@ function readPassword(value) {
 
 function responseError(status) {
   return new BrowserAuthSessionError(status >= 500 ? 'unavailable' : 'rejected');
+}
+
+/** Reads only an allow-listed machine code, never retaining raw server detail. */
+async function readResponseError(response) {
+  if (response.status === 403) {
+    try {
+      const body = await response.json();
+      if (body?.code === 'email_verification_required') return new BrowserAuthSessionError('verification-required');
+    } catch { /* A malformed error remains an ordinary rejected session. */ }
+  }
+  return responseError(response.status);
 }
 
 function isLoopbackHost(hostname) {

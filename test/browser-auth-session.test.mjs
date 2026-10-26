@@ -156,3 +156,27 @@ test('keeps a stored session when MS-Auth is temporarily unavailable', async () 
 function isConfigurationError(error) {
   return error instanceof BrowserAuthSessionError && error.kind === 'configuration';
 }
+
+test('clears unverified old sessions and keeps verification-required responses safe', async () => {
+  const storage = new MemoryStorage();
+  writeStoredBrowserAuthSession(storage, session);
+  const rejected = () => new Response(JSON.stringify({ code: 'email_verification_required', error: 'private-account-detail' }), { status: 403 });
+  await assert.rejects(verifyStoredBrowserAuthSession({ apiBaseUrl, storage, fetchImpl: async () => rejected() }),
+    (error) => error.kind === 'verification-required' && !JSON.stringify(error).includes('private-account'));
+  assert.equal(storage.getItem(BROWSER_AUTH_SESSION_STORAGE_KEY), null);
+  writeStoredBrowserAuthSession(storage, session);
+  await assert.rejects(signInBrowserAuthSession({ apiBaseUrl, storage, email: 'user@example.test', password: 'ExamplePassword1',
+    fetchImpl: async () => rejected() }), (error) => error.kind === 'verification-required');
+  assert.equal(storage.getItem(BROWSER_AUTH_SESSION_STORAGE_KEY), null);
+});
+
+test('treats malformed or unknown 403 error bodies as ordinary rejections without retaining details', async () => {
+  for (const body of ['private non-JSON response', JSON.stringify({ code: 'untrusted-code', detail: 'private detail' })]) {
+    const storage = new MemoryStorage();
+    writeStoredBrowserAuthSession(storage, session);
+    await assert.rejects(verifyStoredBrowserAuthSession({ apiBaseUrl, storage,
+      fetchImpl: async () => new Response(body, { status: 403 }) }),
+    (error) => error.kind === 'rejected' && !JSON.stringify(error).includes('private'));
+    assert.equal(storage.getItem(BROWSER_AUTH_SESSION_STORAGE_KEY), null);
+  }
+});

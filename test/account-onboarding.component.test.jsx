@@ -15,13 +15,13 @@ const password = 'ExamplePassword1';
 test('completes signup, verification, sign-in, profile creation/editing and recovery against deterministic contracts', async () => {
   let profile;
   const requests = [];
-  const code = 'a012bcde';
+  const code = 'a012bcdea012bcdea012bcdea012bcde';
   const resetToken = 'A'.repeat(43);
   vi.stubGlobal('fetch', vi.fn(async (input, init) => {
     const url = new URL(input);
     requests.push({ url, init });
     const body = init.body ? JSON.parse(init.body) : undefined;
-    if (url.pathname.endsWith('/register')) return json({ accessToken: 'signup.discarded', refreshToken: 'signup.discarded' });
+    if (url.pathname.endsWith('/register')) return new Response(JSON.stringify({ message: 'If an eligible account uses that email, verification instructions will be sent.' }), { status: 202 });
     if (url.pathname.endsWith('/emailVerification')) {
       expect(body).toEqual({ code });
       return json({ message: 'Email verified successfully.' });
@@ -46,7 +46,7 @@ test('completes signup, verification, sign-in, profile creation/editing and reco
   fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
   await screen.findByRole('heading', { name: 'Check your email' });
   expect(window.localStorage.getItem(BROWSER_AUTH_SESSION_STORAGE_KEY)).toBeNull();
-  expect(screen.getByRole('link', { name: 'Verify your email address' }).getAttribute('href')).toBe('/account/verify-email/');
+  expect(screen.getByRole('link', { name: 'Enter or request a verification code' }).getAttribute('href')).toBe('/account/verify-email/');
   view.unmount();
 
   view = render(<EmailVerificationPanel apiBaseUrl={apiBaseUrl} />);
@@ -132,7 +132,7 @@ test('allows retry after verification rejection or unavailability without exposi
     .mockRejectedValueOnce(new Error('private-network-detail'))
     .mockResolvedValueOnce(json({ message: 'Email verified successfully.' })));
   render(<EmailVerificationPanel apiBaseUrl={apiBaseUrl} />);
-  fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: 'a012bcde' } });
+  fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: 'a012bcdea012bcdea012bcdea012bcde' } });
   fireEvent.click(screen.getByRole('button', { name: 'Verify email' }));
   await screen.findByText(/That code could not be verified/);
   fireEvent.click(screen.getByRole('button', { name: 'Verify email' }));
@@ -159,3 +159,43 @@ function fillRegistration(confirmation = password) {
   fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: confirmation } });
 }
 function json(body) { return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } }); }
+
+test('supports safe resend without signup, storage or repeated pending submissions', async () => {
+  let finish;
+  vi.stubGlobal('fetch', vi.fn(() => new Promise((resolve) => { finish = resolve; })));
+  render(<EmailVerificationPanel apiBaseUrl={apiBaseUrl} />);
+  expect(screen.getByLabelText('Verification code').maxLength).toBe(32);
+  fireEvent.change(screen.getByLabelText('Registered email address'), { target: { value: email } });
+  const form = screen.getByRole('button', { name: 'Email a new verification code' }).closest('form');
+  fireEvent.submit(form); fireEvent.submit(form);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  const [url, init] = fetch.mock.calls[0];
+  expect(url.pathname).toBe('/v1/users/public/email-verification-requests');
+  expect(JSON.parse(init.body)).toEqual({ email });
+  expect(init.credentials).toBe('omit');
+  finish(new Response(null, { status: 202 }));
+  await screen.findByText(/If an eligible account uses that email/);
+  expect(screen.getByLabelText('Registered email address').value).toBe('');
+  expect(window.localStorage.getItem(BROWSER_AUTH_SESSION_STORAGE_KEY)).toBeNull();
+  expect(document.body.textContent).not.toContain(email);
+  expect(document.body.textContent).toContain('60 seconds');
+});
+
+test('shows resend throttling and verification-required sign-in guidance without raw responses', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('private-email-detail', { status: 429 })));
+  const view = render(<EmailVerificationPanel apiBaseUrl={apiBaseUrl} />);
+  fireEvent.change(screen.getByLabelText('Registered email address'), { target: { value: email } });
+  fireEvent.click(screen.getByRole('button', { name: 'Email a new verification code' }));
+  await screen.findByText(/Too many verification requests/);
+  expect(document.body.textContent).not.toContain('private-email-detail');
+  view.unmount();
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ code: 'email_verification_required', error: 'private account detail' }), { status: 403 })));
+  render(<AccountHub accountsBaseUrl={accountsBaseUrl} authBaseUrl={apiBaseUrl} />);
+  await screen.findByRole('button', { name: 'Sign in' });
+  fireEvent.change(screen.getByLabelText('Email address'), { target: { value: email } });
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: password } });
+  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+  await screen.findByText(/Verify your email before signing in/);
+  expect(document.body.textContent).not.toContain('private account detail');
+  expect(window.localStorage.getItem(BROWSER_AUTH_SESSION_STORAGE_KEY)).toBeNull();
+});

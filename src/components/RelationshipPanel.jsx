@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
-import { BrowserAuthSessionError, verifyStoredBrowserAuthSession } from '../lib/browser-auth-session.mjs';
+import { BrowserAuthSessionError } from '../lib/browser-auth-session.mjs';
+import { EmailVerificationRequiredNotice, useEmailVerificationRecovery } from './EmailVerificationRecovery.jsx';
 import {
   ProfileSocialApiError,
   createMsUserRelationsRequest,
@@ -20,6 +21,7 @@ import '../styles/relationship-panel.css';
 export default function RelationshipPanel({ apiBaseUrl, authBaseUrl }) {
   const [data, setData] = useState(undefined);
   const [status, setStatus] = useState('Loading your connections…');
+  const { requiresVerification, verifySession } = useEmailVerificationRecovery();
 
   useEffect(() => {
     void loadConnections();
@@ -32,7 +34,7 @@ export default function RelationshipPanel({ apiBaseUrl, authBaseUrl }) {
     }
 
     try {
-      const session = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
+      const session = await verifySession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
       if (!session) {
         setStatus('Sign in to manage your connections.');
         return;
@@ -67,7 +69,7 @@ export default function RelationshipPanel({ apiBaseUrl, authBaseUrl }) {
   async function runCommand(method, pathname, body = undefined) {
     if (!apiBaseUrl) return;
     try {
-      const session = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
+      const session = await verifySession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
       if (!session) throw new ProfileSocialApiError('rejected');
       const response = await sendRelationshipRequest(method, pathname, session, body);
       if (!response.ok) throw new ProfileSocialApiError(response.status >= 500 ? 'unavailable' : 'rejected');
@@ -82,7 +84,7 @@ export default function RelationshipPanel({ apiBaseUrl, authBaseUrl }) {
     const request = createMsUserRelationsRequest({ apiBaseUrl, body, method, pathname, session });
     const response = await fetch(request.url, request.init);
     if ((response.status === 401 || response.status === 403) && allowRetry) {
-      const renewedSession = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
+      const renewedSession = await verifySession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
       if (!renewedSession) return response;
       return sendRelationshipRequest(method, pathname, renewedSession, body, false);
     }
@@ -103,6 +105,8 @@ export default function RelationshipPanel({ apiBaseUrl, authBaseUrl }) {
       { targetAuthUserId }
     );
   }
+
+  if (requiresVerification) return <EmailVerificationRequiredNotice />;
 
   return (
     <section className="relationship-panel" aria-labelledby="connections-heading">
@@ -158,7 +162,7 @@ function RelationshipList({ title, entries, actionLabel, onAction }) {
 }
 
 function statusForError(error) {
-  if ((error instanceof BrowserAuthSessionError && error.kind === 'rejected') || (error instanceof ProfileSocialApiError && error.kind === 'rejected')) {
+  if ((error instanceof BrowserAuthSessionError && ['rejected', 'verification-required'].includes(error.kind)) || (error instanceof ProfileSocialApiError && error.kind === 'rejected')) {
     return 'Your sign-in has ended or this change is not available.';
   }
   return 'Connections are not available right now. Please try again later.';

@@ -147,3 +147,18 @@ function json(value) {
 function writeSession(session) {
   window.localStorage.setItem(BROWSER_AUTH_SESSION_STORAGE_KEY, JSON.stringify(session));
 }
+
+test.each([
+  ['profile', AccountProfilePanel, accountsBaseUrl],
+  ['connections', RelationshipPanel, userRelationsBaseUrl]
+])('offers verification recovery and hides %s controls for an old unverified session', async (_name, Panel, apiBaseUrl) => {
+  writeSession({ accessToken: 'access.old', refreshToken: 'refresh.old' });
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ code: 'email_verification_required', error: 'private account detail' }), { status: 403 })));
+  render(<Panel apiBaseUrl={apiBaseUrl} authBaseUrl={authBaseUrl} />);
+  await screen.findByText('Verify your email before continuing.');
+  expect(screen.getByRole('link', { name: 'Verify email or request a new code' }).getAttribute('href')).toBe('/account/verify-email/');
+  expect(screen.queryByRole('button')).toBeNull();
+  expect(window.localStorage.getItem(BROWSER_AUTH_SESSION_STORAGE_KEY)).toBeNull();
+  expect(document.body.textContent).not.toContain('private account detail');
+  expect(fetch).toHaveBeenCalledTimes(1);
+});

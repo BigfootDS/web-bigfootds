@@ -2,7 +2,8 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useEffect, useRef, useState } from 'react';
 
-import { BrowserAuthSessionError, verifyStoredBrowserAuthSession } from '../lib/browser-auth-session.mjs';
+import { BrowserAuthSessionError } from '../lib/browser-auth-session.mjs';
+import { EmailVerificationRequiredNotice, useEmailVerificationRecovery } from './EmailVerificationRecovery.jsx';
 import {
   EditorialNewsApiError,
   createEditorialMediaCompleteRequest,
@@ -39,6 +40,7 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
   const [phase, setPhase] = useState('loading');
   const [selectedLocale, setSelectedLocale] = useState('en-AU');
   const [status, setStatus] = useState('Checking staff access…');
+  const { requiresVerification, verifySession } = useEmailVerificationRecovery();
   const [assets, setAssets] = useState([]);
   const [selectedAssets, setSelectedAssets] = useState([]);
   const [galleryLayout, setGalleryLayout] = useState('carousel');
@@ -76,7 +78,7 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
       return;
     }
     try {
-      const session = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
+      const session = await verifySession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
       if (!session) throw new EditorialNewsApiError('rejected');
       if (id === null) {
         setDraft(createEmptyDraft(locale));
@@ -110,7 +112,7 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
   }
 
   async function requestWithCurrentSession(createRequest, verifiedSession = undefined) {
-    const session = verifiedSession ?? await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
+    const session = verifiedSession ?? await verifySession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
     if (!session) throw new EditorialNewsApiError('rejected');
     let request = createRequest(session);
     let response;
@@ -121,7 +123,7 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
     }
     if (response.status !== 401 && response.status !== 403) return response;
 
-    const renewed = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
+    const renewed = await verifySession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
     if (!renewed) return response;
     request = createRequest(renewed);
     try {
@@ -371,6 +373,8 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
     }).run();
     event.currentTarget.reset();
   }
+
+  if (requiresVerification) return <EmailVerificationRequiredNotice />;
 
   if (phase === 'loading' || phase === 'signed-out' || phase === 'unavailable') {
     return <p aria-live="polite">{status}</p>;
@@ -707,6 +711,6 @@ function statusForError(error) {
 }
 
 function isSignInRejection(error) {
-  return (error instanceof BrowserAuthSessionError && error.kind === 'rejected')
+  return (error instanceof BrowserAuthSessionError && ['rejected', 'verification-required'].includes(error.kind))
     || (error instanceof EditorialNewsApiError && error.kind === 'rejected');
 }

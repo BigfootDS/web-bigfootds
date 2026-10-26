@@ -40,7 +40,7 @@ export function createEmailVerificationRequest(input) {
 }
 
 /**
- * Registers without persisting the API's returned token pair. The visitor
+ * Registers without persisting response data. The generic 202 creates no session; the visitor
  * verifies their email then signs in through the established session boundary.
  * @param {Parameters<typeof createRegistrationRequest>[0] & { fetchImpl?: typeof fetch }} input Form and optional test transport.
  * @returns {Promise<void>} Resolves when MS-Auth accepts signup.

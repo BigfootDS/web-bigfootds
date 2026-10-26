@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
-import { BrowserAuthSessionError, verifyStoredBrowserAuthSession } from '../lib/browser-auth-session.mjs';
+import { BrowserAuthSessionError } from '../lib/browser-auth-session.mjs';
+import { EmailVerificationRequiredNotice, useEmailVerificationRecovery } from './EmailVerificationRecovery.jsx';
 import {
   ProfileSocialApiError,
   createMsAccountsRequest,
@@ -25,10 +26,12 @@ export default function AccountProfilePanel({ apiBaseUrl, authBaseUrl, headingLe
   const [phase, setPhase] = useState('loading');
   const [profileRevision, setProfileRevision] = useState(0);
   const [status, setStatus] = useState('Loading your profile…');
+  const { requiresVerification, verifySession, resetVerification } = useEmailVerificationRecovery();
 
   useEffect(() => {
     let current = true;
 
+    resetVerification();
     setProfile(undefined);
     setPhase('loading');
     setStatus('Loading your profile…');
@@ -45,7 +48,7 @@ export default function AccountProfilePanel({ apiBaseUrl, authBaseUrl, headingLe
       }
 
       try {
-        const session = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
+        const session = await verifySession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
         if (!session) {
           updateState('signed-out', 'Sign in to create or edit your profile.');
           return;
@@ -69,7 +72,7 @@ export default function AccountProfilePanel({ apiBaseUrl, authBaseUrl, headingLe
       setPhase(nextPhase);
       setStatus(nextStatus);
     }
-  }, [apiBaseUrl, authBaseUrl, profileRevision, sessionRevision]);
+  }, [apiBaseUrl, authBaseUrl, profileRevision, sessionRevision, resetVerification, verifySession]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -87,7 +90,7 @@ export default function AccountProfilePanel({ apiBaseUrl, authBaseUrl, headingLe
     }
 
     try {
-      const session = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
+      const session = await verifySession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
       if (!session) throw new ProfileSocialApiError('rejected');
       const response = await sendProfileRequest(profile ? 'PATCH' : 'POST', profile ? '/profiles/me' : '/profiles', session, body);
       if (!response.ok) throw new ProfileSocialApiError(response.status === 409 ? 'conflict' : response.status >= 500 ? 'unavailable' : 'rejected');
@@ -103,12 +106,14 @@ export default function AccountProfilePanel({ apiBaseUrl, authBaseUrl, headingLe
     const request = createMsAccountsRequest({ apiBaseUrl, body, method, pathname, session });
     const response = await fetch(request.url, request.init);
     if ((response.status === 401 || response.status === 403) && allowRetry) {
-      const renewedSession = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
+      const renewedSession = await verifySession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
       if (!renewedSession) return response;
       return sendProfileRequest(method, pathname, renewedSession, body, false);
     }
     return response;
   }
+
+  if (requiresVerification) return <EmailVerificationRequiredNotice />;
 
   if (phase === 'loading') return <p aria-live="polite">{status}</p>;
   if (phase === 'unavailable' || phase === 'signed-out') return <p aria-live="polite">{status}</p>;
@@ -213,6 +218,6 @@ function statusForError(error) {
 }
 
 function isSignInRejection(error) {
-  return (error instanceof BrowserAuthSessionError && error.kind === 'rejected')
+  return (error instanceof BrowserAuthSessionError && ['rejected', 'verification-required'].includes(error.kind))
     || (error instanceof ProfileSocialApiError && error.kind === 'rejected');
 }

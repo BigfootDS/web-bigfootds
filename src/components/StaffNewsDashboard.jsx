@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
-import { BrowserAuthSessionError, verifyStoredBrowserAuthSession } from '../lib/browser-auth-session.mjs';
+import { BrowserAuthSessionError } from '../lib/browser-auth-session.mjs';
+import { EmailVerificationRequiredNotice, useEmailVerificationRecovery } from './EmailVerificationRecovery.jsx';
 import {
   EditorialNewsApiError,
   createEditorialNewsListRequest,
@@ -19,6 +20,7 @@ export default function StaffNewsDashboard({ apiBaseUrl, authBaseUrl }) {
   const [page, setPage] = useState(undefined);
   const [phase, setPhase] = useState('loading');
   const [status, setStatus] = useState('Checking staff access…');
+  const { requiresVerification, verifySession } = useEmailVerificationRecovery();
   const [locale, setLocale] = useState('en-AU');
   const [lifecycle, setLifecycle] = useState('');
 
@@ -55,17 +57,19 @@ export default function StaffNewsDashboard({ apiBaseUrl, authBaseUrl }) {
   }
 
   async function requestWithCurrentSession(createRequest) {
-    const session = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
+    const session = await verifySession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
     if (!session) throw new EditorialNewsApiError('rejected');
     let request = createRequest(session);
     let response = await fetch(request.url, request.init);
     if (response.status !== 401 && response.status !== 403) return response;
 
-    const renewed = await verifyStoredBrowserAuthSession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
+    const renewed = await verifySession({ apiBaseUrl: authBaseUrl, storage: window.localStorage });
     if (!renewed) return response;
     request = createRequest(renewed);
     return await fetch(request.url, request.init);
   }
+
+  if (requiresVerification) return <EmailVerificationRequiredNotice />;
 
   if (phase === 'loading' || phase === 'signed-out' || phase === 'unavailable') {
     return <p aria-live="polite">{status}</p>;
@@ -128,6 +132,6 @@ function statusForError(error) {
 }
 
 function isSignInRejection(error) {
-  return (error instanceof BrowserAuthSessionError && error.kind === 'rejected')
+  return (error instanceof BrowserAuthSessionError && ['rejected', 'verification-required'].includes(error.kind))
     || (error instanceof EditorialNewsApiError && error.kind === 'rejected');
 }

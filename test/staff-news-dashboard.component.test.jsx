@@ -283,3 +283,16 @@ function draftPost(id) {
     updatedAt: '2026-09-12T03:00:00.000Z'
   };
 }
+
+test.each([['dashboard', StaffNewsDashboard], ['editor', StaffNewsComposer]])('offers verification recovery before showing the staff %s', async (_name, Panel) => {
+  window.localStorage.setItem(BROWSER_AUTH_SESSION_STORAGE_KEY, JSON.stringify({ accessToken: 'access.old', refreshToken: 'refresh.old' }));
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ code: 'email_verification_required', detail: 'private staff detail' }), { status: 403 })));
+  render(<Panel apiBaseUrl={newsBaseUrl} authBaseUrl={authBaseUrl} />);
+  await screen.findByText('Verify your email before continuing.');
+  expect(screen.getByRole('link', { name: 'Verify email or request a new code' }).getAttribute('href')).toBe('/account/verify-email/');
+  expect(screen.queryByRole('button')).toBeNull();
+  expect(screen.queryByLabelText('Article')).toBeNull();
+  expect(window.localStorage.getItem(BROWSER_AUTH_SESSION_STORAGE_KEY)).toBeNull();
+  expect(document.body.textContent).not.toContain('private staff detail');
+  expect(fetch).toHaveBeenCalledTimes(1);
+});

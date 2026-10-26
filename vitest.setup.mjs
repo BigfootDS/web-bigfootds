@@ -2,6 +2,12 @@ import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+// JSDOM has no layout. These Range methods let Tiptap focus/insert content;
+// the component tests assert document and transport behaviour, not geometry.
+Object.defineProperties(Range.prototype, {
+  getClientRects: { configurable: true, value: () => [] },
+  getBoundingClientRect: { configurable: true, value: () => new DOMRect() }
+});
 const values = new Map();
 
 Object.defineProperty(window, 'localStorage', {

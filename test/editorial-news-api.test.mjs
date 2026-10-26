@@ -12,6 +12,7 @@ import {
   createEditorialNewsScheduleInput,
   readEditorialMediaCompletion,
   readEditorialMediaUploadIntent,
+  readEditorialMediaPreviewResponse,
   readEditorialNewsList,
   readEditorialNewsPost,
   readEditorialNewsPostResponse,
@@ -176,16 +177,116 @@ test('keeps the upload form capability separate from user credentials and reject
   assert.throws(() => readEditorialMediaUploadIntent({ result: { ...upload, storageObjectKey: 'private' } }), isInvalidResponseError);
 });
 
-test('uses only the bearer credential for a preview redirect to keep the token pair out of storage', () => {
+test('requests JSON preview capability with only the bearer credential and refuses redirects', () => {
   const request = createEditorialMediaPreviewRequest({ apiBaseUrl, assetId, session });
 
-  assert.equal(request.url.href, `https://news.bigfootds.dev/api/v1/editorial/news-media/${assetId}/preview`);
+  assert.equal(request.url.href, `https://news.bigfootds.dev/api/v1/editorial/news-media/${assetId}/preview-capability`);
+  assert.equal(request.init.headers.get('accept'), 'application/json');
   assert.equal(request.init.headers.get('Authorization'), 'Bearer access.token-1');
   assert.equal(request.init.headers.get('accessToken'), null);
   assert.equal(request.init.headers.get('refreshToken'), null);
   assert.equal(request.init.credentials, 'omit');
   assert.equal(request.init.referrerPolicy, 'no-referrer');
+  assert.equal(request.init.redirect, 'error');
 });
+
+const previewUrl = 'https://storage.googleapis.com/news-test/news-media/v1/image/verified?X-Goog-Signature=fixture-only';
+
+test('starts a fresh storage read without a session and returns only a blob URL', async () => {
+  let requested;
+  let retainedImage;
+  const result = await readEditorialMediaPreviewResponse({
+    response: previewCapability(),
+    fetchImpl: async (url, init) => {
+      requested = { init, url };
+      return new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/png' } });
+    },
+    urlApi: { createObjectURL: (image) => { retainedImage = image; return 'blob:private-preview'; } }
+  });
+  assert.equal(result, 'blob:private-preview');
+  assert.equal(requested.url.href, previewUrl);
+  assert.equal(requested.init.method, 'GET');
+  assert.equal(requested.init.mode, 'cors');
+  assert.equal(requested.init.credentials, 'omit');
+  assert.equal(requested.init.redirect, 'error');
+  assert.equal(requested.init.cache, 'no-store');
+  assert.equal(requested.init.referrerPolicy, 'no-referrer');
+  assert.deepEqual([...requested.init.headers.entries()], [['accept', 'image/*']]);
+  assert.equal(retainedImage.type, 'image/png');
+  assert.equal(retainedImage.size, 3);
+});
+
+test('rejects malformed capabilities before any storage request and hides their contents', async () => {
+  let reads = 0;
+  const values = [null, [], {}, { result: {} }, { result: { url: previewUrl }, extra: true },
+    { result: { url: previewUrl, extra: true } }, ...[
+      undefined, 42, 'not a URL', 'http://storage.googleapis.com/image', 'https://other.example/image',
+      'https://user:password@storage.googleapis.com/image', 'https://:password@storage.googleapis.com/image', previewUrl + '#fragment',
+      'https://storage.googleapis.com:8443/image', ' ' + previewUrl, previewUrl + 'a'.repeat(8_192)
+    ].map((url) => ({ result: { url } }))];
+  for (const value of values) {
+    await assert.rejects(readEditorialMediaPreviewResponse({
+      response: new Response(JSON.stringify(value)),
+      fetchImpl: async () => { reads += 1; throw new Error('Unexpected storage read.'); }
+    }), (error) => error instanceof EditorialNewsApiError && error.kind === 'invalid-response' && !error.message.includes(previewUrl));
+  }
+  await assert.rejects(readEditorialMediaPreviewResponse({ response: new Response('not JSON') }), isInvalidResponseError);
+  const redirected = previewCapability();
+  Object.defineProperty(redirected, 'redirected', { value: true });
+  await assert.rejects(readEditorialMediaPreviewResponse({ response: redirected }), isInvalidResponseError);
+  assert.equal(reads, 0);
+});
+
+test('keeps capability denial and storage failures safe without creating a preview', async () => {
+  let reads = 0;
+  for (const [status, kind] of [[401, 'rejected'], [404, 'not-found'], [503, 'unavailable']]) {
+    await assert.rejects(readEditorialMediaPreviewResponse({
+      response: new Response(null, { status }),
+      fetchImpl: async () => { reads += 1; }
+    }), (error) => error instanceof EditorialNewsApiError && error.kind === kind);
+  }
+  assert.equal(reads, 0);
+  await assert.rejects(readEditorialMediaPreviewResponse({
+    response: previewCapability(), fetchImpl: async () => { throw new Error(previewUrl); }
+  }), (error) => error instanceof EditorialNewsApiError && error.kind === 'unavailable' && !error.message.includes(previewUrl));
+  await assert.rejects(readEditorialMediaPreviewResponse({
+    response: previewCapability(), fetchImpl: async () => new Response('provider detail', { status: 403 })
+  }), (error) => error instanceof EditorialNewsApiError && error.kind === 'rejected');
+});
+
+test('accepts only bounded image blobs and cleans up invalid transport results before allocation', async () => {
+  let allocations = 0;
+  const invalidImages = [
+    new Response('<html>provider failure</html>', { headers: { 'content-type': 'text/html' } }),
+    new Response(null, { headers: { 'content-type': 'image/png' } }),
+    new Response(new Uint8Array(10 * 1024 * 1024 + 1), { headers: { 'content-type': 'image/png' } }),
+    { ok: true, blob: async () => { throw new Error('Unreadable image.'); } }
+  ];
+  const redirected = new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/png' } });
+  Object.defineProperty(redirected, 'redirected', { value: true });
+  invalidImages.push(redirected);
+  for (const imageResponse of invalidImages) {
+    await assert.rejects(readEditorialMediaPreviewResponse({
+      response: previewCapability(), fetchImpl: async () => imageResponse,
+      urlApi: { createObjectURL: () => { allocations += 1; return 'blob:unexpected'; } }
+    }), isInvalidResponseError);
+  }
+  assert.equal(allocations, 0);
+  assert.equal(await readEditorialMediaPreviewResponse({
+    response: previewCapability(),
+    fetchImpl: async () => new Response(new Uint8Array(10 * 1024 * 1024), { headers: { 'content-type': 'image/webp' } }),
+    urlApi: { createObjectURL: () => 'blob:maximum-image' }
+  }), 'blob:maximum-image');
+  await assert.rejects(readEditorialMediaPreviewResponse({
+    response: previewCapability(),
+    fetchImpl: async () => new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/jpeg' } }),
+    urlApi: { createObjectURL: () => { throw new Error('Allocation failed.'); } }
+  }), isInvalidResponseError);
+});
+
+function previewCapability() {
+  return new Response(JSON.stringify({ result: { url: previewUrl } }), { headers: { 'content-type': 'application/json' } });
+}
 
 test('keeps server-side content validation distinct from session rejection', async () => {
   await assert.rejects(

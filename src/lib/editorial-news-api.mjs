@@ -2,6 +2,7 @@ import { normaliseRichNewsDocument } from './news-rich-document.mjs';
 
 const maximumTokenLength = 8_192;
 const maximumUploadBytes = 10 * 1024 * 1024;
+const maximumPreviewUrlLength = 8_192;
 const tokenPattern = /^[A-Za-z0-9._~-]+$/;
 const postIdPattern = /^[a-f0-9]{24}$/i;
 const assetIdPattern = /^nma_[a-f0-9]{32}$/;
@@ -166,12 +167,10 @@ export function createEditorialMediaCompleteRequest({ apiBaseUrl, assetId, sessi
 }
 
 /**
- * Creates the bearer-only draft-image preview request. The endpoint redirects
- * to a signed storage URL, so it intentionally omits the custom access and
- * refresh headers that normal editorial requests carry. Fetch removes the
- * standard `Authorization` header before a cross-origin redirect, keeping the
- * browser token pair out of Cloud Storage. Callers keep any resulting blob URL
- * in memory and revoke it when the editor no longer needs it.
+ * Requests a private JSON capability using only the human bearer credential.
+ * The image must be fetched separately: following a cross-origin API redirect
+ * would give the storage request an Origin of null. Refuse redirects here so
+ * no unexpected response can silently restore that broken transport.
  */
 export function createEditorialMediaPreviewRequest({ apiBaseUrl, assetId, session }) {
   const safeSession = readSession(session);
@@ -179,12 +178,13 @@ export function createEditorialMediaPreviewRequest({ apiBaseUrl, assetId, sessio
     init: {
       cache: 'no-store',
       credentials: 'omit',
-      headers: new Headers({ accept: 'image/*', Authorization: `Bearer ${safeSession.accessToken}` }),
+      headers: new Headers({ accept: 'application/json', Authorization: `Bearer ${safeSession.accessToken}` }),
       method: 'GET',
+      redirect: 'error',
       referrerPolicy: 'no-referrer'
     },
     url: new URL(
-      `/api/v1/editorial/news-media/${readAssetId(assetId)}/preview`,
+      `/api/v1/editorial/news-media/${readAssetId(assetId)}/preview-capability`,
       readPublicEditorialNewsBaseUrl(apiBaseUrl)
     )
   };
@@ -448,19 +448,67 @@ export async function sendEditorialMediaUpload({ fetchImpl = fetch, file, upload
 }
 
 /**
- * Converts a completed attested preview fetch into an in-memory object URL.
+ * Reads the staff capability, then starts a fresh credential-free image GET.
  *
- * The caller owns the fetch so it can apply the one permitted session-renewal
- * retry. A durable `<img>` cannot attach the required staff headers, so this
- * avoids leaking a signed URL into persisted content or static output.
+ * The caller owns the authenticated API retry. This second request deliberately
+ * receives no session, cookies or referrer and cannot follow another redirect.
+ * The capability stays transient; callers must revoke the returned blob URL
+ * when it is discarded, including a late result after unmount.
+ * @param {{ response: Response, fetchImpl?: typeof fetch, urlApi?: Pick<typeof URL, 'createObjectURL'> }} input Attested JSON response and injectable browser boundaries.
+ * @returns {Promise<string>} In-memory blob URL, never the signed storage URL.
  */
-export async function readEditorialMediaPreviewResponse({ response, urlApi = URL }) {
+export async function readEditorialMediaPreviewResponse({ response, fetchImpl = fetch, urlApi = URL }) {
   if (!response.ok) throw responseError(response.status);
+  let storageUrl;
   try {
-    return urlApi.createObjectURL(await response.blob());
+    if (response.redirected) throw new Error('Unexpected redirect.');
+    const value = await response.json();
+    if (!isExactRecord(value, ['result']) || !isExactRecord(value.result, ['url'])) throw new Error('Invalid capability.');
+    storageUrl = readPreviewStorageUrl(value.result.url);
   } catch {
     throw new EditorialNewsApiError('invalid-response');
   }
+
+  let imageResponse;
+  try {
+    imageResponse = await fetchImpl(storageUrl, {
+      cache: 'no-store',
+      credentials: 'omit',
+      headers: new Headers({ accept: 'image/*' }),
+      method: 'GET',
+      mode: 'cors',
+      redirect: 'error',
+      referrerPolicy: 'no-referrer'
+    });
+  } catch {
+    throw new EditorialNewsApiError('unavailable');
+  }
+  if (!imageResponse.ok) throw responseError(imageResponse.status);
+  try {
+    const image = await imageResponse.blob();
+    if (imageResponse.redirected || !supportedImageTypes.has(image.type) || image.size < 1 || image.size > maximumUploadBytes) {
+      throw new Error('Invalid image response.');
+    }
+    return urlApi.createObjectURL(image);
+  } catch {
+    throw new EditorialNewsApiError('invalid-response');
+  }
+}
+
+/**
+ * Restricts a transient capability to the standard HTTPS Cloud Storage host.
+ * The outer reader replaces failures with static errors because native URL
+ * parser errors can retain their input; callers must not log those raw errors.
+ * @param {unknown} value Private capability URL supplied by MS-News.
+ * @returns {URL} Validated transport URL, never a persistent content value.
+ */
+function readPreviewStorageUrl(value) {
+  if (typeof value !== 'string' || value.length > maximumPreviewUrlLength || value.trim() !== value) throw new Error('Invalid storage URL.');
+  const url = new URL(value);
+  if (url.protocol !== 'https:' || url.hostname !== 'storage.googleapis.com' || url.port || url.username || url.password || url.hash) {
+    throw new Error('Invalid storage URL.');
+  }
+  return url;
 }
 
 /** Turns a retained legacy plain-text body into safe paragraph nodes only when the editor saves it. */

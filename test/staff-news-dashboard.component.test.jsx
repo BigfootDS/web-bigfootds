@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import StaffNewsComposer, { StaffNewsRichEditor } from '../src/components/StaffNewsComposer.jsx';
@@ -137,9 +137,21 @@ test('loads the standalone local demonstration without a staff session or networ
   expect(fetch).not.toHaveBeenCalled();
 });
 
-test('keeps a verified image available for insertion when only its temporary preview fails', async () => {
+test.each(['capability-failure', 'image-failure', 'success', 'late-completion'])('handles private preview %s without forwarding credentials or retaining capabilities', async (mode) => {
   const postId = '0123456789abcdef01234567';
   const assetId = 'nma_0123456789abcdef0123456789abcdef';
+  const storageReadUrl = 'https://storage.googleapis.com/news-test/verified?X-Goog-Signature=fixture-only';
+  const calls = [];
+  let savedDraft;
+  let completeImage;
+  const pendingImage = new Promise((resolve) => { completeImage = resolve; });
+  const createObjectURL = vi.fn(() => 'blob:private-news-preview');
+  const revokeObjectURL = vi.fn();
+  const BrowserURL = URL;
+  vi.stubGlobal('URL', class extends BrowserURL {
+    static createObjectURL = createObjectURL;
+    static revokeObjectURL = revokeObjectURL;
+  });
   window.history.replaceState({}, '', `/admin/news/editor/?id=${postId}&locale=en-AU`);
   window.localStorage.setItem(BROWSER_AUTH_SESSION_STORAGE_KEY, JSON.stringify({
     accessToken: 'access.initial',
@@ -163,10 +175,17 @@ test('keeps a verified image available for insertion when only its temporary pre
       return '';
     }
   });
-  vi.stubGlobal('fetch', vi.fn(async (input) => {
+  vi.stubGlobal('fetch', vi.fn(async (input, init) => {
     const url = new URL(input);
+    calls.push({ init, url });
     if (url.origin === authBaseUrl) return json({ accessToken: 'access.renewed', refreshToken: 'refresh.current' });
-    if (url.pathname.endsWith(`/news/${postId}`)) return json({ result: draftPost(postId) });
+    if (url.pathname.endsWith(`/news/${postId}`)) {
+      if (init.method === 'PUT') {
+        savedDraft = JSON.parse(init.body);
+        return json({ result: { ...draftPost(postId), content: savedDraft.content } });
+      }
+      return json({ result: draftPost(postId) });
+    }
     if (url.pathname.endsWith('/upload-intents')) return json({
       result: {
         assetId,
@@ -178,19 +197,58 @@ test('keeps a verified image available for insertion when only its temporary pre
     if (url.pathname.endsWith(`/${assetId}/complete`)) return json({
       result: { assetId, byteLength: 42, contentType: 'image/png', dimensions: { height: 180, width: 320 }, status: 'ready' }
     });
-    if (url.pathname.endsWith(`/${assetId}/preview`)) throw new Error('private preview transport failure');
+    if (url.pathname.endsWith(`/${assetId}/preview-capability`)) {
+      if (mode === 'capability-failure') throw new Error('private preview transport failure');
+      return json({ result: { url: storageReadUrl } });
+    }
+    if (url.origin === 'https://storage.googleapis.com') {
+      if (mode === 'image-failure') return new Response('private storage failure', { status: 403 });
+      if (mode === 'late-completion') return pendingImage;
+      return new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/png' } });
+    }
     throw new Error(`Unexpected request ${url}`);
   }));
 
-  render(<StaffNewsComposer apiBaseUrl={newsBaseUrl} authBaseUrl={authBaseUrl} />);
+  const { unmount } = render(<StaffNewsComposer apiBaseUrl={newsBaseUrl} authBaseUrl={authBaseUrl} />);
 
   await screen.findByRole('heading', { name: 'Edit News record' });
   fireEvent.submit(screen.getByRole('button', { name: 'Upload and verify image' }).closest('form'));
 
-  await screen.findByText('Image verified. Its temporary preview could not be loaded, but it can still be inserted into the article or selected for a gallery.');
-  expect(screen.getByText('Temporary image preview unavailable.')).toBeTruthy();
-  expect(screen.getByRole('button', { name: 'Insert image' })).toBeTruthy();
+  if (mode === 'late-completion') {
+    await waitFor(() => expect(calls.some(({ url }) => url.href === storageReadUrl)).toBe(true));
+    unmount();
+    await act(async () => { completeImage(new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/png' } })); });
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:private-news-preview'));
+  } else if (mode === 'success') {
+    expect((await screen.findByRole('img', { name: 'Website overhaul preview' })).getAttribute('src')).toBe('blob:private-news-preview');
+    fireEvent.click(screen.getByRole('button', { name: 'Insert image' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(savedDraft).toBeDefined());
+    expect(JSON.stringify(savedDraft)).toContain(assetId);
+    expect(JSON.stringify(savedDraft)).not.toContain('X-Goog-Signature');
+    expect(JSON.stringify(savedDraft)).not.toContain('blob:');
+    unmount();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:private-news-preview');
+  } else {
+    await screen.findByText('Image verified. Its temporary preview could not be loaded, but it can still be inserted into the article or selected for a gallery.');
+    expect(screen.getByText('Temporary image preview unavailable.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Insert image' })).toBeTruthy();
+    expect(createObjectURL).not.toHaveBeenCalled();
+  }
+  const capabilityCall = calls.find(({ url }) => url.pathname.endsWith('/preview-capability'));
+  expect(capabilityCall.init.headers.get('Authorization')).toBe('Bearer access.renewed');
+  expect(capabilityCall.init.headers.get('accessToken')).toBeNull();
+  expect(capabilityCall.init.headers.get('refreshToken')).toBeNull();
+  for (const call of calls.filter(({ url }) => url.origin === 'https://storage.googleapis.com')) {
+    expect([...call.init.headers.entries()]).toEqual([['accept', 'image/*']]);
+    expect(call.init.credentials).toBe('omit');
+    expect(call.init.redirect).toBe('error');
+    expect(call.init.referrerPolicy).toBe('no-referrer');
+  }
+  expect(window.localStorage.getItem(BROWSER_AUTH_SESSION_STORAGE_KEY)).not.toContain(storageReadUrl);
+  expect(document.body.innerHTML).not.toContain('X-Goog-Signature');
   expect(screen.queryByText('private preview transport failure')).toBeNull();
+  expect(screen.queryByText('private storage failure')).toBeNull();
 });
 
 test('uses the normal staff schedule route to publish a legacy article at its source date', async () => {

@@ -30,9 +30,9 @@ const emptyEditorDocument = { content: [{ type: 'paragraph' }], type: 'doc' };
 /**
  * Provides the staff-only MS-News composer on a static route.
  *
- * Records, media capabilities, signed preview data, and token pairs stay in
- * browser memory or local storage rather than being emitted into Astro's
- * static HTML. MS-News remains responsible for attestation, validation,
+ * Records, media capabilities and preview blobs stay in browser memory. Only
+ * the normal token pair uses the established session storage boundary; none
+ * is emitted into Astro's static HTML. MS-News owns attestation, validation,
  * lifecycle decisions, and its audit history.
  */
 export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
@@ -48,9 +48,15 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
   const [isStandaloneLocalDemo, setIsStandaloneLocalDemo] = useState(false);
   const editorRef = useRef(null);
   const previewUrls = useRef(new Set());
+  const previewActive = useRef(true);
 
-  useEffect(() => () => {
-    for (const url of previewUrls.current) URL.revokeObjectURL(url);
+  useEffect(() => {
+    previewActive.current = true;
+    return () => {
+      previewActive.current = false;
+      for (const url of previewUrls.current) URL.revokeObjectURL(url);
+      previewUrls.current.clear();
+    };
   }, []);
 
   useEffect(() => {
@@ -301,6 +307,10 @@ export default function StaffNewsComposer({ apiBaseUrl, authBaseUrl }) {
           session
         }));
         previewUrl = await readEditorialMediaPreviewResponse({ response: previewResponse });
+        if (!previewActive.current) {
+          URL.revokeObjectURL(previewUrl);
+          return;
+        }
         previewUrls.current.add(previewUrl);
       } catch {
         // Preview transport is an editor aid only. Completion already proved the

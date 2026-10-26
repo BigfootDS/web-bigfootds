@@ -139,6 +139,7 @@ export default function BrowserAuthSessionPanel({ apiBaseUrl, onSessionChange })
         <button type="submit">Sign in</button>
       </form>
       <p><a href="/account/forgot-password/">Forgot your password?</a></p>
+      <p><a href="/account/register/">Create an account</a> or <a href="/account/verify-email/">verify your email address</a>.</p>
     </section>
   );
 }

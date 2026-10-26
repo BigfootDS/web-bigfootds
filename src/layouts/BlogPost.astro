@@ -1,12 +1,11 @@
 ---
-import type { CollectionEntry } from 'astro:content';
 import BaseHead from '../components/BaseHead.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import FormattedDate from '../components/FormattedDate.astro';
 import ArticleSd from '../components/GoogleStructuredData/ArticleSd.astro';
 
-type Props = CollectionEntry<'blog'>['data'] & { isNewsArticle?: boolean };
+type Props = { title: string; description: string; pubDate?: Date; updatedDate?: Date; heroImage?: string; isNewsArticle?: boolean };
 
 const { title, description, pubDate, updatedDate, heroImage, isNewsArticle = false } = Astro.props as Props;
 ---

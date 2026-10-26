@@ -47,6 +47,8 @@ jobs:
           CI: true
           NODE_ENV: production
           PUBLIC_MS_AUTH_BASE_URL: ${{ vars.MS_AUTH_BASE_URL }}
+          PUBLIC_MS_ACCOUNTS_BASE_URL: ${{ vars.MS_ACCOUNTS_BASE_URL }}
+          PUBLIC_MS_USERRELATIONS_BASE_URL: ${{ vars.MS_USERRELATIONS_BASE_URL }}
           PUBLIC_MS_NEWS_BASE_URL: ${{ vars.MS_NEWS_BASE_URL }}
           MS_NEWS_BASE_URL: ${{ vars.MS_NEWS_BASE_URL }}
           MS_LIVEOPSCONFIG_BASE_URL: ${{ vars.MS_LIVEOPSCONFIG_BASE_URL }}

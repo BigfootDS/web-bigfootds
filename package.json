@@ -9,6 +9,7 @@
     "prebuild": "npm run news:sync && npm run events:sync",
     "build": "astro build",
     "test": "node --test && npm run test:components",
+    "test:build": "node scripts/verify-account-news-build.mjs",
     "test:components": "vitest run",
     "preview": "astro preview",
     "astro": "astro"

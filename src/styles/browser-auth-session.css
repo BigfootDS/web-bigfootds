@@ -5,9 +5,17 @@
 	border-radius: 0.5rem;
 }
 
-.browser-auth-panel form {
+.browser-auth-panel form,
+.browser-auth-panel fieldset {
 	display: grid;
 	gap: 0.5rem;
+}
+
+.browser-auth-panel fieldset {
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
 }
 
 .browser-auth-panel input,

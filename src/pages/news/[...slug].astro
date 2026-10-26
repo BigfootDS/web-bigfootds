@@ -1,21 +1,23 @@
 ---
-import { type CollectionEntry, getCollection } from 'astro:content';
-import BlogPost from '../../layouts/BlogPost.astro';
-import { render } from 'astro:content';
+import { getGeneratedPublicNews } from '../../lib/public-news.mjs';
+import { getPublishedLegacyNewsRedirects } from '../../lib/news-legacy-redirects.mjs';
 
 export async function getStaticPaths() {
-	const posts = await getCollection('blog');
-	return posts.map((post) => ({
-		params: { slug: post.id },
-		props: post,
+	return getPublishedLegacyNewsRedirects(await getGeneratedPublicNews()).map((redirect) => ({
+		params: { slug: redirect.slug },
+		props: { target: redirect.target },
 	}));
 }
-type Props = CollectionEntry<'blog'>;
-
-const post = Astro.props;
-const { Content } = await render(post);
+const { target } = Astro.props;
 ---
-
-<BlogPost {...post.data} isNewsArticle={true}>
-	<Content />
-</BlogPost>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Article moved | BigfootDS</title>
+    <meta http-equiv="refresh" content={`0; url=${target}`} />
+    <meta name="robots" content="noindex, follow" />
+    <link rel="canonical" href={new URL(target, Astro.site)} />
+  </head>
+  <body><main><h1>Article moved</h1><p><a href={target}>Read this article on News</a>.</p></main></body>
+</html>

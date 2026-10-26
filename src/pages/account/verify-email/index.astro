@@ -1,0 +1,21 @@
+---
+import BaseHead from '../../../components/BaseHead.astro';
+import Footer from '../../../components/Footer.astro';
+import Header from '../../../components/Header.astro';
+import EmailVerificationPanel from '../../../components/EmailVerificationPanel.jsx';
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <BaseHead title="Verify your email" description="Enter the code from your BigfootDS signup confirmation email." />
+    <meta name="referrer" content="no-referrer" />
+  </head>
+  <body>
+    <Header />
+    <main>
+      <EmailVerificationPanel client:only="react" apiBaseUrl={import.meta.env.PUBLIC_MS_AUTH_BASE_URL} />
+      <noscript><p>Email verification needs JavaScript to send a secure request. Please enable JavaScript and try again.</p></noscript>
+    </main>
+    <Footer />
+  </body>
+</html>
